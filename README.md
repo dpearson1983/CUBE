@@ -1,6 +1,6 @@
 # CUBE - CUDA Bispectrum Estimation
 This software will calculate the galaxy bispectrum monopole and quadrupole using NVIDIA GPUs to 
-speed up the O(N^2) calculation. This is based on the code that was used in this [paper]{https://arxiv.org/abs/1712.04970}. However, this version *should* be more efficient by having a better work
+speed up the O(N^2) calculation. This is based on the code that was used in this [paper](https://arxiv.org/abs/1712.04970). However, this version *should* be more efficient by having a better work
 load balance between the threads.
 
 ## Structure of the thread blocks
