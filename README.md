@@ -32,7 +32,7 @@ up" the non-repeating part of the bottom half of the 2D grid, we can keep the va
 blocks full of active threads, and each threads work load should be almost identical meaning no individual thread should be idle for too long.
 
 ## To Do List:
-1. Add in parts of BESTFITS that can be re-used in this code
+1. ~~Add in parts of BESTFITS that can be re-used in this code~~
 2. Create code to cut out the small cubes
 3. Implement Bianchi et al. 2015 method of encoded line-of-sight information to get A_2 for the
 quadrupole calculation.
