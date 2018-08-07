@@ -1,0 +1,148 @@
+#ifndef _BISPEC_H_
+#define _BISPEC_H_
+
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <helper_functions.h>
+#include <vector_types.h>
+
+#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ > 600
+#else
+__device__ double atomicAdd(double* address, double val)
+{
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed, 
+                        __double_as_longlong(val + 
+                        __longlong_as_double(assumed)));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
+#endif
+
+__device__ double monopole(double3 k1, double3, k2, double3 k3) {
+    return k1.x*k2.x*k3.x - k1.x*k2.y*k3.y - k1.y*k2.x*k3.y - k1.y*k2.y*k3.x;
+}
+
+__device__ void swapIfGreater(double &x, double &y) {
+    if (x > y) {
+        double temp = x;
+        x = y;
+        y = temp;
+    }
+}
+
+__device__ int getBin(double k1, double k2, double k3, double binWidth, int N, double k_min) {
+    swapIfGreater(k1, k2);
+    swapIfGreater(k1, k3);
+    swapIfGreater(k2, k3);
+    
+}
+    
+
+/* This is the GPU function to calculate the bispectrum. It will be called with a 2D grid of 2D
+ * thread blocks. The y dimension corresponds to k_1 and the x dimension corresponds to k_2,
+ * up until the point that we need to bin the value at which point the vectors will be ordered from
+ * smallest to largest to match the order associated with the bins.
+ * 
+ * Since there is a lot going on, and the data structures don't necessarily make obvious what is
+ * being stored in each array, the following notes are provided:
+ * 
+ * 1. double3 *dk3d - The double3 data structure is provided by vector_types.h with members x, y, 
+ *                    and z. This particular array stores the Fourier transformed overdensity
+ *                    field with the real part at member x, and the imaginary part at member y.
+ *                    For convenience, the last data member stores the magnitude of the k vector
+ *                    at that grid point.
+ * 2. int4 *k_vec - The int4 data structure is provided by vector_type.h with members x, y, z, and w.
+ *                  This particular array stores the integer multiples of the fundamental frequencies
+ *                  to define each k vector in the Fourier transformed overdensity grid. The x, y and
+ *                  z members correspond to the x, y and z components of the vectors. The w member
+ *                  stores the flattened array index for the location in dk3d to negate look-up time.
+ * 3. double *Bk - This data structure simply stores the calculated bispectrum.
+ * 4. int4 N_grid - This contains the dimensions of dk3d and the total number of elements in the
+ *                  x, y, z and w members, respectively. This is used for bounds checking after
+ *                  calculating k_3.
+ * 5. int N_kvec - This is the number of k vectors stored in k_vec. It is used for bounds checking
+ *                 each thread as there will usually be more total threads than total k vectors.
+ * 6. double binWidth - This is the width of the bispectrum bins, used to locate which bin each k
+ *                      vector belongs in, which in turn determines which Bk element to add the 
+ *                      result to.
+ * 7. int numBins - The number of bispectrum bins, which in this current iteration must be 691, or
+ *                  a k_min = 0.04 and a k_max = 0.168 and a binWidth of 0.008. Eventually the code
+ *                  will be made more flexible by making the shared data structure be defined with
+ *                  the extern flag.
+ * 8. double2 k_lim - The double2 data structure is provided by vector_types.h with members x and y.
+ *                    This particular variable contains k_min in the x member and k_max in the y
+ *                    member. 
+ */
+__global__ void calcB_0(double3 *A_0, int4 *k_vec, double *B_0, int4 N_grid, int N_kvec, 
+                        double binWidth, int numBins, double2 k_lim) {
+    int k_j = threadIdx.x + blockIdx.x*blockDim.x;
+    int k_i = threadIdx.y + blockIdx.y*blockDim.y;
+    // TODO: Look into how this stacking will affect the dimensionality of the 2D grid of blocks.
+    if (k_j < k_i) {
+        k_i = N_kvec - k_i;
+        k_j = N_kvec - 1 - k_j;
+    }
+    int blockLocalTID = threadIdx.y + blockDim.y*threadIdx.x;
+    
+    // TODO: Change to a variable that is passed to the function instead of calculating each time.
+    //       This is likely a fairly minor optimization, but is an optimization, nonetheless.
+    int xShift = N_grid.x/2;
+    int yShift = N_grid.y/2;
+    int zShift = N_grid.z/2;
+    
+    __shared__ double Bk_local[691];
+    if (blockLocalTID < 691) {
+        Bk_local[blockLocalTID] = 0.0;
+    }
+    __syncthreads();
+    
+    if (k_j < N_kvec && k_i < N_kvec) {
+        int4 k_k = {-k_i.x - k_j.x, -k_i.y - k_j.y, -k_i.z - k_j.z, 0};
+        int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
+        if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
+            k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
+            double val = monopole(dk3d[k_i.w], dk3d[k_j.w], dk3d[k_k.w]);
+            int bin = getBin(dk3d[k_i.w].z, dk3d[k_j.w].z, dk3d[k_k.w].z, binWidth, numBins, k_lim.x);
+            atomicAdd(&Bk_local[bin], val);
+        }
+    }
+    __syncthreads();
+    
+    if (blockLocalTID < 691) {
+        if (Bk_local[blockLocalTID] != 0) {
+            atomicAdd(&Bk[blockLocalTID], Bk_local[blockLocalTID]);
+        }
+    }
+}
+
+__global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *k_vec, double *B_0, double *B_2, 
+                         int4 N_grid, int N_kvec, double binWidth, int numBins, double2 k_lim) {
+    int k_j = threadIdx.x + blockIdx.x*blockDim.x;
+    int k_i = threadIdx.y + blockIdx.y*blockDim.y;
+    int blockLocalTID = threadIdx.y + blockDim.y*threadIdx.x;
+    
+    __shared__ double Bk_local[2*691];
+    if (blockLocalTID < 691 ) {
+        Bk_local[blockLocalTID] = 0.0;
+        Bk_local[blockLocalTID + 691] = 0.0;
+    }
+    __syncthreads();
+    
+    if (k_2 < N_kvec && k_1 < N_kvec) {
+        int4 k_k
+    }
+    __syncthreads();
+    
+    if (blockLocalTID < 691) {
+        if (Bk_Local[blockLocalTID] != 0) {
+            atomicAdd(&Bk[blockLocalTID], Bk_local[blockLocalTID]);
+        }
+    }
+}
+}
+
+#endif
