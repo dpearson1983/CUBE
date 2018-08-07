@@ -22,7 +22,7 @@ __device__ double atomicAdd(double* address, double val)
 }
 #endif
 
-__device__ double monopole(double3 k1, double3, k2, double3 k3) {
+__device__ double realPart(double3 k1, double3, k2, double3 k3) {
     return k1.x*k2.x*k3.x - k1.x*k2.y*k3.y - k1.y*k2.x*k3.y - k1.y*k2.y*k3.x;
 }
 
@@ -34,11 +34,30 @@ __device__ void swapIfGreater(double &x, double &y) {
     }
 }
 
-__device__ int getBin(double k1, double k2, double k3, double binWidth, int N, double k_min) {
+__device__ int getBin(double k1, double k2, double k3, double binWidth, int N, double k_min, 
+                      double k_max) {
     swapIfGreater(k1, k2);
     swapIfGreater(k1, k3);
     swapIfGreater(k2, k3);
     
+    int index = 0;
+    for (int i = 0; i < N; ++i) {
+        double k_1 = k_min + (i + 0.5)*binWidth;
+        for (int j = i; j < N; ++j) {
+            double k_2 = k_min + (j + 0.5)*binWidth;
+            for (int k = j; k < N; ++k) {
+                double k_3 = k_min + (k + 0.5)*binWidth;
+                if (k_3 <= k_1 + k_2 && k_3 <= k_max) {
+                    if (k_1 == k1 && k_2 == k2 && k_3 == k3) {
+                        return index;
+                    } else {
+                        index++;
+                    }
+                }
+            }
+        }
+    }
+    return -1;
 }
     
 
@@ -50,7 +69,7 @@ __device__ int getBin(double k1, double k2, double k3, double binWidth, int N, d
  * Since there is a lot going on, and the data structures don't necessarily make obvious what is
  * being stored in each array, the following notes are provided:
  * 
- * 1. double3 *dk3d - The double3 data structure is provided by vector_types.h with members x, y, 
+ * 1. double3 *A_0 - The double3 data structure is provided by vector_types.h with members x, y, 
  *                    and z. This particular array stores the Fourier transformed overdensity
  *                    field with the real part at member x, and the imaginary part at member y.
  *                    For convenience, the last data member stores the magnitude of the k vector
@@ -59,9 +78,9 @@ __device__ int getBin(double k1, double k2, double k3, double binWidth, int N, d
  *                  This particular array stores the integer multiples of the fundamental frequencies
  *                  to define each k vector in the Fourier transformed overdensity grid. The x, y and
  *                  z members correspond to the x, y and z components of the vectors. The w member
- *                  stores the flattened array index for the location in dk3d to negate look-up time.
+ *                  stores the flattened array index for the location in A_0 to negate look-up time.
  * 3. double *Bk - This data structure simply stores the calculated bispectrum.
- * 4. int4 N_grid - This contains the dimensions of dk3d and the total number of elements in the
+ * 4. int4 N_grid - This contains the dimensions of A_0 and the total number of elements in the
  *                  x, y, z and w members, respectively. This is used for bounds checking after
  *                  calculating k_3.
  * 5. int N_kvec - This is the number of k vectors stored in k_vec. It is used for bounds checking
@@ -105,8 +124,8 @@ __global__ void calcB_0(double3 *A_0, int4 *k_vec, double *B_0, int4 N_grid, int
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
         if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
-            double val = monopole(dk3d[k_i.w], dk3d[k_j.w], dk3d[k_k.w]);
-            int bin = getBin(dk3d[k_i.w].z, dk3d[k_j.w].z, dk3d[k_k.w].z, binWidth, numBins, k_lim.x);
+            double val = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
+            int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
             atomicAdd(&Bk_local[bin], val);
         }
     }
@@ -114,7 +133,7 @@ __global__ void calcB_0(double3 *A_0, int4 *k_vec, double *B_0, int4 N_grid, int
     
     if (blockLocalTID < 691) {
         if (Bk_local[blockLocalTID] != 0) {
-            atomicAdd(&Bk[blockLocalTID], Bk_local[blockLocalTID]);
+            atomicAdd(&B_0[blockLocalTID], Bk_local[blockLocalTID]);
         }
     }
 }
@@ -123,6 +142,10 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *k_vec, double *B_0, d
                          int4 N_grid, int N_kvec, double binWidth, int numBins, double2 k_lim) {
     int k_j = threadIdx.x + blockIdx.x*blockDim.x;
     int k_i = threadIdx.y + blockIdx.y*blockDim.y;
+    if (k_j < k_i) {
+        k_i = N_kvec - k_i;
+        k_j = N_kvec - 1 - k_j;
+    }
     int blockLocalTID = threadIdx.y + blockDim.y*threadIdx.x;
     
     __shared__ double Bk_local[2*691];
@@ -133,16 +156,76 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *k_vec, double *B_0, d
     __syncthreads();
     
     if (k_2 < N_kvec && k_1 < N_kvec) {
-        int4 k_k
+        int4 k_k = {-k_i.x - k_j.x, -k_i.y - k_j.y, -k_i.z - k_j.z, 0};
+        int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
+        if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
+            k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
+            double B0 = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
+            double B2 = realPart(A_2[k_i.w], A_0[k_j.w], A_0[k_k.w]);
+            int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
+            atomicAdd(&Bk_local[bin], B0);
+            atomicAdd(&Bk_loacl[bin + numBins], B2);
+        }
     }
     __syncthreads();
     
     if (blockLocalTID < 691) {
-        if (Bk_Local[blockLocalTID] != 0) {
-            atomicAdd(&Bk[blockLocalTID], Bk_local[blockLocalTID]);
+        if (Bk_local[blockLocalTID] != 0) {
+            atomicAdd(&B_0[blockLocalTID], Bk_local[blockLocalTID]);
+        }
+        if (Bk_local[blockLocalTID + numBins] != 0) {
+            atomicAdd(&B_2[blockLocalTID + numBins], Bk_local[blockLocalTID + numBins]);
         }
     }
 }
+
+__global__ void calcN_tri(double3 *A_0, int4 *k_vec, unsigned int *N_tri, int4 N_grid, int N_kvec,
+                          double binWidth, int numBins, double2 k_lim) {
+    int k_j = threadIdx.x + blockIdx.x*blockDim.x;
+    int k_i = threadIdx.y + blockIdx.y*blockDim.y;
+    // TODO: Look into how this stacking will affect the dimensionality of the 2D grid of blocks.
+    if (k_j < k_i) {
+        k_i = N_kvec - k_i;
+        k_j = N_kvec - 1 - k_j;
+    }
+    int blockLocalTID = threadIdx.y + blockDim.y*threadIdx.x;
+    
+    // TODO: Change to a variable that is passed to the function instead of calculating each time.
+    //       This is likely a fairly minor optimization, but is an optimization, nonetheless.
+    int xShift = N_grid.x/2;
+    int yShift = N_grid.y/2;
+    int zShift = N_grid.z/2;
+    
+    __shared__ double Ntri_local[691];
+    if (blockLocalTID < 691) {
+        Ntri_local[blockLocalTID] = 0.0;
+    }
+    __syncthreads();
+    
+    if (k_j < N_kvec && k_i < N_kvec) {
+        int4 k_k = {-k_i.x - k_j.x, -k_i.y - k_j.y, -k_i.z - k_j.z, 0};
+        int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
+        if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
+            k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
+            int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
+            atomicAdd(&Ntri_local[bin], 1);
+        }
+    }
+    __syncthreads();
+    
+    if (blockLocalTID < 691) {
+        if (Bk_local[blockLocalTID] != 0) {
+            atomicAdd(&N_tri[blockLocalTID], Ntri_local[blockLocalTID]);
+        }
+    }
+}
+
+__global__ normB_l(double *B_l, unsigned int *N_tri, double norm, int numBins) {
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    if (tid < numBins && N_tri[tid] > 0) {
+        B_l[tid] /= (norm*N_tri[tid]);
+    }
 }
 
 #endif
