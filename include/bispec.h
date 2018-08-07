@@ -6,6 +6,7 @@
 #include <helper_functions.h>
 #include <vector_types.h>
 
+// Define atomicAdd for older NVIDIA GPUs
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ > 600
 #else
 __device__ double atomicAdd(double* address, double val)
@@ -22,6 +23,7 @@ __device__ double atomicAdd(double* address, double val)
 }
 #endif
 
+// Returns the real part of the product of three complex numbers.
 __device__ double realPart(double3 k1, double3, k2, double3 k3) {
     return k1.x*k2.x*k3.x - k1.x*k2.y*k3.y - k1.y*k2.x*k3.y - k1.y*k2.y*k3.x;
 }
@@ -34,6 +36,11 @@ __device__ void swapIfGreater(double &x, double &y) {
     }
 }
 
+// This function finds the index for a given triplet of k's based on their magnitudes. Unfortunately,
+// given the triangle and the k1 <= k2 <= k3 conditions, a direct calculation of the index is not
+// very straightforward. For now, this function works, though its not very efficient. Once all of the
+// core algorithms are working, this will be explored further to find a better algorithm. In testing,
+// execution of this function seems to be on the order of a few microseconds on average.
 __device__ int getBin(double k1, double k2, double k3, double binWidth, int N, double k_min, 
                       double k_max) {
     swapIfGreater(k1, k2);
@@ -105,7 +112,6 @@ __global__ void calcB_0(double3 *A_0, int4 *k_vec, double *B_0, int4 N_grid, int
         k_i = N_kvec - k_i;
         k_j = N_kvec - 1 - k_j;
     }
-    int blockLocalTID = threadIdx.y + blockDim.y*threadIdx.x;
     
     // TODO: Change to a variable that is passed to the function instead of calculating each time.
     //       This is likely a fairly minor optimization, but is an optimization, nonetheless.
@@ -113,27 +119,15 @@ __global__ void calcB_0(double3 *A_0, int4 *k_vec, double *B_0, int4 N_grid, int
     int yShift = N_grid.y/2;
     int zShift = N_grid.z/2;
     
-    __shared__ double Bk_local[691];
-    if (blockLocalTID < 691) {
-        Bk_local[blockLocalTID] = 0.0;
-    }
-    __syncthreads();
-    
     if (k_j < N_kvec && k_i < N_kvec) {
         int4 k_k = {-k_i.x - k_j.x, -k_i.y - k_j.y, -k_i.z - k_j.z, 0};
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
         if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
             double val = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
+            // TODO: Add error checking for bin number, e.g. if bin = -1 handle error
             int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
-            atomicAdd(&Bk_local[bin], val);
-        }
-    }
-    __syncthreads();
-    
-    if (blockLocalTID < 691) {
-        if (Bk_local[blockLocalTID] != 0) {
-            atomicAdd(&B_0[blockLocalTID], Bk_local[blockLocalTID]);
+            atomicAdd(&B_0[bin], val);
         }
     }
 }
@@ -146,14 +140,6 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *k_vec, double *B_0, d
         k_i = N_kvec - k_i;
         k_j = N_kvec - 1 - k_j;
     }
-    int blockLocalTID = threadIdx.y + blockDim.y*threadIdx.x;
-    
-    __shared__ double Bk_local[2*691];
-    if (blockLocalTID < 691 ) {
-        Bk_local[blockLocalTID] = 0.0;
-        Bk_local[blockLocalTID + 691] = 0.0;
-    }
-    __syncthreads();
     
     if (k_2 < N_kvec && k_1 < N_kvec) {
         int4 k_k = {-k_i.x - k_j.x, -k_i.y - k_j.y, -k_i.z - k_j.z, 0};
@@ -163,18 +149,8 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *k_vec, double *B_0, d
             double B0 = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
             double B2 = realPart(A_2[k_i.w], A_0[k_j.w], A_0[k_k.w]);
             int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
-            atomicAdd(&Bk_local[bin], B0);
-            atomicAdd(&Bk_loacl[bin + numBins], B2);
-        }
-    }
-    __syncthreads();
-    
-    if (blockLocalTID < 691) {
-        if (Bk_local[blockLocalTID] != 0) {
-            atomicAdd(&B_0[blockLocalTID], Bk_local[blockLocalTID]);
-        }
-        if (Bk_local[blockLocalTID + numBins] != 0) {
-            atomicAdd(&B_2[blockLocalTID + numBins], Bk_local[blockLocalTID + numBins]);
+            atomicAdd(&B_0[bin], B0);
+            atomicAdd(&B_2[bin], B2);
         }
     }
 }
@@ -188,7 +164,6 @@ __global__ void calcN_tri(double3 *A_0, int4 *k_vec, unsigned int *N_tri, int4 N
         k_i = N_kvec - k_i;
         k_j = N_kvec - 1 - k_j;
     }
-    int blockLocalTID = threadIdx.y + blockDim.y*threadIdx.x;
     
     // TODO: Change to a variable that is passed to the function instead of calculating each time.
     //       This is likely a fairly minor optimization, but is an optimization, nonetheless.
@@ -196,26 +171,13 @@ __global__ void calcN_tri(double3 *A_0, int4 *k_vec, unsigned int *N_tri, int4 N
     int yShift = N_grid.y/2;
     int zShift = N_grid.z/2;
     
-    __shared__ double Ntri_local[691];
-    if (blockLocalTID < 691) {
-        Ntri_local[blockLocalTID] = 0.0;
-    }
-    __syncthreads();
-    
     if (k_j < N_kvec && k_i < N_kvec) {
         int4 k_k = {-k_i.x - k_j.x, -k_i.y - k_j.y, -k_i.z - k_j.z, 0};
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
         if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
             int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
-            atomicAdd(&Ntri_local[bin], 1);
-        }
-    }
-    __syncthreads();
-    
-    if (blockLocalTID < 691) {
-        if (Bk_local[blockLocalTID] != 0) {
-            atomicAdd(&N_tri[blockLocalTID], Ntri_local[blockLocalTID]);
+            atomicAdd(&N_tri[bin], 1);
         }
     }
 }
