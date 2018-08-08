@@ -38,8 +38,8 @@ int main(int argc, char *argv[]) {
     setFileType(p.gets("dataFileType"), dataFileType);
     setFileType(p.gets("ranFileType"), ranFileType);
     
-    std::vector<double> delta(N.x*N.y*2.0*(N.z/2 + 1));
     double alpha;
+    std::vector<double> delta(N.x*N.y*N.z);
     
     std::cout << "Reading in data and randoms files..." << std::endl;
     // Since the N's can be large values, individual arrays for the FFTs will be quite large. Instead
@@ -62,15 +62,8 @@ int main(int argc, char *argv[]) {
         
         std::cout << "   Computing overdensity..." << std::endl;
         #pragma omp parallel for
-        for (size_t i = 0; i < N.x; ++i) {
-            for (size_t j = 0; j < N.y; ++j) {
-                for (size_t k = 0; k < N.z; ++k) {
-                    int index1 = k + N.z*(j + N.y*i);
-                    int index2 = k + 2*(N.z/2 + 1)*(j + N.y*i);
-                    
-                    delta[index2] = gal[index1] - alpha*ran[index1];
-                }
-            }
+        for (size_t i = 0; i < gal.size(); ++i) {
+            density[i] = gal[i] - alpha*ran[i];
         }
     }
     std::cout << "Done!" << std::endl;
@@ -78,4 +71,12 @@ int main(int argc, char *argv[]) {
     std::vector<double> kx = fft_freq(N.x, L.x);
     std::vector<double> ky = fft_freq(N.y, L.y);
     std::vector<double> kz = fft_freq(N.z, L.z);
+    
+    std::vector<double> A_0(N.x*N.y*2*(N.z/2 + 1));
+    std::vector<double> A_2(N.x*N.y*2*(N.z/2 + 1));
+    
+    get_A0(delta, A_0, N);
+    get_A2(delta, A_2, N, L, r_min);
+    
+    // TODO: Setup up small cubes, call GPU functions, output result.
 }
