@@ -3,6 +3,8 @@ This software will calculate the galaxy bispectrum monopole and quadrupole using
 speed up the O(N^2) calculation. This is based on the code that was used in this [paper](https://arxiv.org/abs/1712.04970). However, this version *should* be more efficient by having a better work
 load balance between the threads.
 
+**NOTE:** This code is still in developement and has not yet been tested. In fact, there are still large chunks of code that needs to be written before this software can run.
+
 ## Structure of the thread blocks
 When calculating the galaxy bispectrum, it is first necessary to calculate overdensity fields, and 
 then perform a Fourier transform. This gives you 3D field of frequency vectors. The first step after
