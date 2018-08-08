@@ -3,6 +3,7 @@
 #include <vector_types.h>
 #include <fftw3.h>
 #include <omp.h>
+#include "../include/cube.h"
 
 #ifndef PI
 #define PI 3.1415926535897932384626433832795
