@@ -33,7 +33,7 @@ blocks full of active threads, and each threads work load should be almost ident
 
 ## To Do List:
 1. ~~Add in parts of BESTFITS that can be re-used in this code~~
-2. Create code to cut out the small cubes
+2. ~~Create code to cut out the small cubes~~
 3. Implement Bianchi et al. 2015 method of encoded line-of-sight information to get A_2 for the
 quadrupole calculation.
 4. Structure main.cu
