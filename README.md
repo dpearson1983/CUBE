@@ -3,7 +3,7 @@ This software will calculate the galaxy bispectrum monopole and quadrupole using
 speed up the *O*(*N*<sup>2</sup>) calculation. This is based on the code that was used in this [paper](https://arxiv.org/abs/1712.04970). However, this version *should* be more efficient by having a better work
 load balance between the threads.
 
-**NOTE:** This code is still in developement and has not yet been tested. In fact, there are still large chunks of code that needs to be written before this software can run.
+**NOTE:** This code is still in development and has not yet been tested. In fact, there are still large chunks of code that needs to be written before this software can run.
 
 ## Structure of the thread blocks
 When calculating the galaxy bispectrum, it is first necessary to calculate overdensity fields, and 
@@ -38,3 +38,4 @@ blocks full of active threads, and each threads work load should be almost ident
 2. ~~Create code to cut out the small cubes~~
 3. ~~Implement Bianchi et al. 2015 method of encoded line-of-sight information to get A_2 for the quadrupole calculation.~~
 4. Structure main.cu
+5. Implement bispectrum quadrupole shot-noise estimator
