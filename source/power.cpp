@@ -1,7 +1,7 @@
 #include <vector>
 #include <cmath>
 #include <fftw3.h>
-#include "../include/tpods.h"
+#include <vector_types.h>
 #include "../include/power.h"
 
 void binFrequencies(fftw_complex *delta, std::vector<double> &P, std::vector<int> &N_k,

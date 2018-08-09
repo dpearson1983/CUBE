@@ -1,14 +1,14 @@
 #include <vector>
 #include <fftw3.h>
 #include <omp.h>
-#include <vector_trypes.h>
+#include <vector_types.h>
 #include "../include/transformers.h"
 #include "../include/line_of_sight.h"
 
 const std::string wisdom_file = "fftWisdom.dat";
 
 void get_A0(std::vector<double> &dr, std::vector<double> &A_0, int3 N) {
-    if (A_0.size != N.x*N.y*2*(N.z/2 + 1)) {
+    if (A_0.size() != N.x*N.y*2*(N.z/2 + 1)) {
         A_0.resize(N.x*N.y*2*(N.z/2 + 1));
     }
     generate_wisdom_fipr2c(A_0, N, wisdom_file, omp_get_max_threads()); // TODO: Add this function to transformers
@@ -43,10 +43,10 @@ void sum_Bs(fftw_complex *A_2, fftw_complex *Bxx, fftw_complex *Byy, fftw_comple
                 
                 A_2[index][0] = (kx[i]*kx[i]*Bxx[index][0] + ky[j]*ky[j]*Byy[index][0] + 
                                  kz[k]*kz[k]*Bzz[index][0] + 2.0*kx[i]*ky[j]*Bxy[index][0] +
-                                 2.0*kx[i]*kz[k]*Bxz[index][0] + 2.0*ky[j[*kz[k]*Byz[index][0])/k_magsq;
+                                 2.0*kx[i]*kz[k]*Bxz[index][0] + 2.0*ky[j]*kz[k]*Byz[index][0])/k_magsq;
                 A_2[index][1] = (kx[i]*kx[i]*Bxx[index][1] + ky[j]*ky[j]*Byy[index][1] + 
                                  kz[k]*kz[k]*Bzz[index][1] + 2.0*kx[i]*ky[j]*Bxy[index][1] +
-                                 2.0*kx[i]*kz[k]*Bxz[index][1] + 2.0*ky[j[*kz[k]*Byz[index][1])/k_magsq;
+                                 2.0*kx[i]*kz[k]*Bxz[index][1] + 2.0*ky[j]*kz[k]*Byz[index][1])/k_magsq;
             }
         }
     }
@@ -64,15 +64,15 @@ void get_A2(std::vector<double> &dr, std::vector<double> &A_2, int3 N, double3 L
     std::vector<double> Byz(N.x*N.y*2*(N.z/2 + 1));
     generate_wisdom_fipr2c(Bxx, N, wisdom_file, omp_get_max_threads());
     
-    double3 dr = {L.x/N.x, L.y/N.y, L.z/N.z};
+    double3 del_r = {L.x/N.x, L.y/N.y, L.z/N.z};
     
     #pragma omp parallel for
     for (int i = 0; i < N.x; ++i) {
-        double r_x = r_min.x + (i + 0.5)*dr.x;
+        double r_x = r_min.x + (i + 0.5)*del_r.x;
         for (int j = 0; j < N.y; ++j) {
-            double r_y = r_min.y + (j + 0.5)*dr.y;
+            double r_y = r_min.y + (j + 0.5)*del_r.y;
             for (int k = 0; k < N.z; ++k) {
-                double r_z = r_min.z + (k + 0.5)*dr.z;
+                double r_z = r_min.z + (k + 0.5)*del_r.z;
                 double r_magsq = r_x*r_x + r_y*r_y+ r_z*r_z;
                 int index1 = k + N.z*(j + N.y*i);
                 int index2 = k + 2*(N.z/2 + 1)*(j + N.y*j);
@@ -174,15 +174,15 @@ void get_A4(std::vector<double> &dr, std::vector<double> &A_4, int3 N, double3 L
     std::vector<double> Czxy(N.x*N.y*2*(N.z/2 + 1));
     generate_wisdom_fipr2c(Cxxx, N, wisdom_file, omp_get_max_threads());
     
-    double3 dr = {L.x/N.x, L.y/N.y, L.z/N.z};
+    double3 del_r = {L.x/N.x, L.y/N.y, L.z/N.z};
     
     #pragma omp parallel for
     for (int i = 0; i < N.x; ++i) {
-        double r_x = r_min.x + (i + 0.5)*dr.x;
+        double r_x = r_min.x + (i + 0.5)*del_r.x;
         for (int j = 0; j < N.y; ++j) {
-            double r_y = r_min.y + (j + 0.5)*dr.y;
+            double r_y = r_min.y + (j + 0.5)*del_r.y;
             for (int k = 0; k < N.z; ++k) {
-                double r_z = r_min.z + (k + 0.5)*dr.z
+                double r_z = r_min.z + (k + 0.5)*del_r.z;
                 double r_magsq = r_x*r_x + r_y*r_y+ r_z*r_z;
                 int index1 = k + N.z*(j + N.y*i);
                 int index2 = k + 2*(N.z/2 + 1)*(j + N.y*j);

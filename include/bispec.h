@@ -24,7 +24,7 @@ __device__ double atomicAdd(double* address, double val)
 #endif
 
 // Returns the real part of the product of three complex numbers.
-__device__ double realPart(double3 k1, double3, k2, double3 k3) {
+__device__ double realPart(double3 k1, double3 k2, double3 k3) {
     return k1.x*k2.x*k3.x - k1.x*k2.y*k3.y - k1.y*k2.x*k3.y - k1.y*k2.y*k3.x;
 }
 
@@ -103,7 +103,7 @@ __device__ int getBin(double k1, double k2, double k3, double binWidth, int N, d
  *                    This particular variable contains k_min in the x member and k_max in the y
  *                    member. 
  */
-__global__ void calcB_0(double3 *A_0, int4 *k_vec, double *B_0, int4 N_grid, int N_kvec, 
+__global__ void calcB_0(double3 *A_0, int4 *kvec, double *B_0, int3 N_grid, int N_kvec, 
                         double binWidth, int numBins, double2 k_lim) {
     int k_j = threadIdx.x + blockIdx.x*blockDim.x;
     int k_i = threadIdx.y + blockIdx.y*blockDim.y;
@@ -120,24 +120,24 @@ __global__ void calcB_0(double3 *A_0, int4 *k_vec, double *B_0, int4 N_grid, int
     int zShift = N_grid.z/2;
     
     if (k_j < N_kvec && k_i < N_kvec) {
-        int4 k_k = {-k_i.x - k_j.x, -k_i.y - k_j.y, -k_i.z - k_j.z, 0};
+        int4 k_k = {-kvec[k_i].x - kvec[k_j].x, -kvec[k_i].y - kvec[k_j].y, -kvec[k_i].z - kvec[k_j].z, 0};
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
-        if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
+        if (i.x >= 0 && i.y >= 0 && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
             if (A_0[k_k.w].z >= k_lim.x && A_0[k_k.w].z < k_lim.y) {
-                double val = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
+                double B0 = realPart(A_0[kvec[k_i].w], A_0[kvec[k_j].w], A_0[k_k.w]);
                 // TODO: Add error checking for bin number, e.g. if bin = -1 handle error
-                int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
+                int bin = getBin(A_0[kvec[k_i].w].z, A_0[kvec[k_j].w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x, k_lim.y);
                 if (bin < numBins) {
-                    atomicAdd(&B_0[bin], val);
+                    atomicAdd(&B_0[bin], B0);
                 }
             }
         }
     }
 }
 
-__global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *k_vec, double *B_0, double *B_2, 
-                         int4 N_grid, int N_kvec, double binWidth, int numBins, double2 k_lim) {
+__global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *kvec, double *B_0, double *B_2, 
+                         int3 N_grid, int N_kvec, double binWidth, int numBins, double2 k_lim) {
     int k_j = threadIdx.x + blockIdx.x*blockDim.x;
     int k_i = threadIdx.y + blockIdx.y*blockDim.y;
     if (k_j < k_i) {
@@ -145,15 +145,21 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *k_vec, double *B_0, d
         k_j = N_kvec - 1 - k_j;
     }
     
-    if (k_2 < N_kvec && k_1 < N_kvec) {
-        int4 k_k = {-k_i.x - k_j.x, -k_i.y - k_j.y, -k_i.z - k_j.z, 0};
+    // TODO: Change to a variable that is passed to the function instead of calculating each time.
+    //       This is likely a fairly minor optimization, but is an optimization, nonetheless.
+    int xShift = N_grid.x/2;
+    int yShift = N_grid.y/2;
+    int zShift = N_grid.z/2;
+    
+    if (k_j < N_kvec && k_i < N_kvec) {
+        int4 k_k = {-kvec[k_i].x - kvec[k_j].x, -kvec[k_i].y - kvec[k_j].y, -kvec[k_i].z - kvec[k_j].z, 0};
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
-        if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
+        if (i.x >= 0 && i.y >= 0 && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
             if (A_0[k_k.w].z >= k_lim.x && A_0[k_k.w].z < k_lim.y) {
-                double B0 = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
-                double B2 = realPart(A_2[k_i.w], A_0[k_j.w], A_0[k_k.w]);
-                int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
+                double B0 = realPart(A_0[kvec[k_i].w], A_0[kvec[k_j].w], A_0[k_k.w]);
+                double B2 = realPart(A_2[kvec[k_i].w], A_0[kvec[k_j].w], A_0[k_k.w]);
+                int bin = getBin(A_0[kvec[k_i].w].z, A_0[kvec[k_j].w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x, k_lim.y);
                 if (bin < numBins) {
                     atomicAdd(&B_0[bin], B0);
                     atomicAdd(&B_2[bin], B2);
@@ -163,7 +169,7 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *k_vec, double *B_0, d
     }
 }
 
-__global__ void calcN_tri(double3 *A_0, int4 *k_vec, unsigned int *N_tri, int4 N_grid, int N_kvec,
+__global__ void calcN_tri(double3 *A_0, int4 *kvec, unsigned int *N_tri, int3 N_grid, int N_kvec,
                           double binWidth, int numBins, double2 k_lim) {
     int k_j = threadIdx.x + blockIdx.x*blockDim.x;
     int k_i = threadIdx.y + blockIdx.y*blockDim.y;
@@ -180,12 +186,12 @@ __global__ void calcN_tri(double3 *A_0, int4 *k_vec, unsigned int *N_tri, int4 N
     int zShift = N_grid.z/2;
     
     if (k_j < N_kvec && k_i < N_kvec) {
-        int4 k_k = {-k_i.x - k_j.x, -k_i.y - k_j.y, -k_i.z - k_j.z, 0};
+        int4 k_k = {-kvec[k_i].x - kvec[k_j].x, -kvec[k_i].y - kvec[k_j].y, -kvec[k_i].z - kvec[k_j].z, 0};
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
-        if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
+        if (i.x >= 0 && i.y >= 0 && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
             if (A_0[k_k.w].z >= k_lim.x && A_0[k_k.w].z < k_lim.y) {
-                int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
+                int bin = getBin(A_0[kvec[k_i].w].z, A_0[kvec[k_j].w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x, k_lim.y);
                 if (bin < numBins) {
                     atomicAdd(&N_tri[bin], 1);
                 }
@@ -194,7 +200,7 @@ __global__ void calcN_tri(double3 *A_0, int4 *k_vec, unsigned int *N_tri, int4 N
     }
 }
 
-__global__ normB_l(double *B_l, unsigned int *N_tri, double norm, int numBins) {
+__global__ void normB_l(double *B_l, unsigned int *N_tri, double norm, int numBins) {
     int tid = threadIdx.x + blockIdx.x*blockDim.x;
     
     if (tid < numBins && N_tri[tid] > 0) {
@@ -202,9 +208,9 @@ __global__ normB_l(double *B_l, unsigned int *N_tri, double norm, int numBins) {
     }
 }
 
-int getNumBispecBins(double k_min, double k_max, double Delta_k, std::vector<double3> &ks) {
+int getNumBispecBins(double k_min, double k_max, double binWidth, std::vector<double3> &ks) {
     int totBins = 0;
-    int N = (k_max - k_min)/Delta_k;
+    int N = (k_max - k_min)/binWidth;
     
     for (int i = 0; i < N; ++i) {
         double k_1 = k_min + (i + 0.5)*binWidth;

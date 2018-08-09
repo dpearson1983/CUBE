@@ -27,7 +27,7 @@ double fundamental_frequency(int N, double L) {
 }
 
 void generate_wisdom_foopr2c(std::vector<double> &dr, std::vector<fftw_complex> &dk, int3 N, 
-                       std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+                       std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     size_t N_com = N.x*N.y*(N.z/2 + 1);
     if (dr.size() == N_tot && dk.size() == N_com) {
@@ -47,7 +47,7 @@ void generate_wisdom_foopr2c(std::vector<double> &dr, std::vector<fftw_complex> 
 }
 
 void generate_wisdom_boopc2r(std::vector<double> &dr, std::vector<fftw_complex> &dk, int3 N, 
-                       std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+                       std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     size_t N_com = N.x*N.y*(N.z/2 + 1);
     if (dr.size() == N_tot && dk.size() == N_com) {
@@ -67,7 +67,7 @@ void generate_wisdom_boopc2r(std::vector<double> &dr, std::vector<fftw_complex> 
 }
 
 void generate_wisdom_fipr2c(std::vector<double> &delta, int3 N, std::string wisdom_file,
-                   int nthreads = omp_get_max_threads()) {
+                   int nthreads) {
     size_t N_tot = N.x*N.y*2*(N.z/2 + 1);
     if (delta.size() == N_tot) {
         fftw_init_threads();
@@ -87,7 +87,7 @@ void generate_wisdom_fipr2c(std::vector<double> &delta, int3 N, std::string wisd
 }
 
 void generate_wisdom_bipc2r(std::vector<double> &delta, int3 N, std::string wisdom_file,
-                   int nthreads = omp_get_max_threads()) {
+                   int nthreads) {
     size_t N_tot = N.x*N.y*2*(N.z/2 + 1);
     if (delta.size() == N_tot) {
         fftw_init_threads();
@@ -107,7 +107,7 @@ void generate_wisdom_bipc2r(std::vector<double> &delta, int3 N, std::string wisd
 }
 
 void generate_wisdom_foopc2c(std::vector<fftw_complex> &dr, std::vector<fftw_complex> &dk, int3 N,
-             std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+             std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     if (dr.size() == N_tot && dk.size() == N_tot) {
         fftw_init_threads();
@@ -127,7 +127,7 @@ void generate_wisdom_foopc2c(std::vector<fftw_complex> &dr, std::vector<fftw_com
 }
 
 void generate_wisdom_boopc2c(std::vector<fftw_complex> &dr, std::vector<fftw_complex> &dk, int3 N,
-             std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+             std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     if (dr.size() == N_tot && dk.size() == N_tot) {
         fftw_init_threads();
@@ -147,7 +147,7 @@ void generate_wisdom_boopc2c(std::vector<fftw_complex> &dr, std::vector<fftw_com
 }
 
 void generate_wisdom_fipc2c(std::vector<fftw_complex> &delta, int3 N,
-             std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+             std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     if (delta.size() == N_tot) {
         fftw_init_threads();
@@ -167,7 +167,7 @@ void generate_wisdom_fipc2c(std::vector<fftw_complex> &delta, int3 N,
 }
 
 void generate_wisdom_bipc2c(std::vector<fftw_complex> &delta, int3 N,
-             std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+             std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     if (delta.size() == N_tot) {
         fftw_init_threads();
@@ -187,7 +187,7 @@ void generate_wisdom_bipc2c(std::vector<fftw_complex> &delta, int3 N,
 } 
 
 void foop_r2c(std::vector<double> &dr, std::vector<fftw_complex> &dk, int3 N, 
-                       std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+                       std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     size_t N_com = N.x*N.y*(N.z/2 + 1);
     if (dr.size() == N_tot && dk.size() == N_com) {
@@ -209,7 +209,7 @@ void foop_r2c(std::vector<double> &dr, std::vector<fftw_complex> &dk, int3 N,
 }
 
 void boop_c2r(std::vector<double> &dr, std::vector<fftw_complex> &dk, int3 N,
-                        std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+                        std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     size_t N_com = N.x*N.y*(N.z/2 + 1);
     if (dr.size() == N_tot && dk.size() == N_com) {
@@ -231,7 +231,7 @@ void boop_c2r(std::vector<double> &dr, std::vector<fftw_complex> &dk, int3 N,
 }
 
 void fip_r2c(std::vector<double> &delta, int3 N, std::string wisdom_file,
-                   int nthreads = omp_get_max_threads()) {
+                   int nthreads) {
     size_t N_tot = N.x*N.y*2*(N.z/2 + 1);
     if (delta.size() == N_tot) {
         fftw_init_threads();
@@ -253,7 +253,7 @@ void fip_r2c(std::vector<double> &delta, int3 N, std::string wisdom_file,
 }
 
 void bip_c2r(std::vector<double> &delta, int3 N, std::string wisdom_file,
-                   int nthreads = omp_get_max_threads()) {
+                   int nthreads) {
     size_t N_tot = N.x*N.y*2*(N.z/2 + 1);
     if (delta.size() == N_tot) {
         fftw_init_threads();
@@ -275,7 +275,7 @@ void bip_c2r(std::vector<double> &delta, int3 N, std::string wisdom_file,
 }
 
 void foop_c2c(std::vector<fftw_complex> &dr, std::vector<fftw_complex> &dk, int3 N,
-             std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+             std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     if (dr.size() == N_tot && dk.size() == N_tot) {
         fftw_init_threads();
@@ -297,7 +297,7 @@ void foop_c2c(std::vector<fftw_complex> &dr, std::vector<fftw_complex> &dk, int3
 }
 
 void boop_c2c(std::vector<fftw_complex> &dr, std::vector<fftw_complex> &dk, int3 N,
-             std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+             std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     if (dr.size() == N_tot && dk.size() == N_tot) {
         fftw_init_threads();
@@ -319,7 +319,7 @@ void boop_c2c(std::vector<fftw_complex> &dr, std::vector<fftw_complex> &dk, int3
 }
 
 void fip_c2c(std::vector<fftw_complex> &delta, int3 N,
-             std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+             std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     if (delta.size() == N_tot) {
         fftw_init_threads();
@@ -341,7 +341,7 @@ void fip_c2c(std::vector<fftw_complex> &delta, int3 N,
 }
 
 void bip_c2c(std::vector<fftw_complex> &delta, int3 N,
-             std::string wisdom_file, int nthreads = omp_get_max_threads()) {
+             std::string wisdom_file, int nthreads) {
     size_t N_tot = N.x*N.y*N.z;
     if (delta.size() == N_tot) {
         fftw_init_threads();

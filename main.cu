@@ -11,11 +11,16 @@
 #include "include/transformers.h"
 #include "include/power.h"
 #include "include/cube.h"
+#include "include/cic.h"
 #include "include/line_of_sight.h"
+#include "include/file_io.h"
 #include "include/harppi.h"
 
+#ifndef PI
+#define PI 3.1415926535897932384626433832795
+#endif
+
 int main(int argc, char *argv[]) {
-    parameters p(argv[1]);
     std::cout << "Initializing..." << std::endl;
     parameters p(argv[1]);
     p.print();
@@ -66,7 +71,7 @@ int main(int argc, char *argv[]) {
         std::cout << "   Computing overdensity..." << std::endl;
         #pragma omp parallel for
         for (size_t i = 0; i < gal.size(); ++i) {
-            density[i] = gal[i] - alpha*ran[i];
+            delta[i] = gal[i] - alpha*ran[i];
         }
     }
     std::cout << "Done!" << std::endl;
@@ -101,27 +106,27 @@ int main(int argc, char *argv[]) {
     int numBispecBins = getNumBispecBins(p.getd("k_min"), p.getd("k_max"), p.getd("Delta_k"), ks);
     std::vector<unsigned int> N_tri(numBispecBins);
     std::vector<double> B_0(numBispecBins);
-    std::vector<double> B_2(numBisepcBins);
+    std::vector<double> B_2(numBispecBins);
     unsigned int *dN_tri;
     double *dB_0, *dB_2;
     double3 *da_0, *da_2;
     int4 *dkvec;
     
     // Allocate GPU memory
-    gpuErrchk(cudaMalloc((void **)&dN_tri, numBisepcBins*sizeof(unsigned int)));
-    gpuErrchk(cudaMalloc((void **)&dB_0, numBisepcBins*sizeof(double)));
-    gpuErrchk(cudaMalloc((void **)&dB_2, numBisepcBins*sizeof(double)));
-    gpuErrchk(cudaMalloc((void **)&da_0, numBisepcBins*sizeof(double3)));
-    gpuErrchk(cudaMalloc((void **)&da_2, numBisepcBins*sizeof(double3)));
+    gpuErrchk(cudaMalloc((void **)&dN_tri, numBispecBins*sizeof(unsigned int)));
+    gpuErrchk(cudaMalloc((void **)&dB_0, numBispecBins*sizeof(double)));
+    gpuErrchk(cudaMalloc((void **)&dB_2, numBispecBins*sizeof(double)));
+    gpuErrchk(cudaMalloc((void **)&da_0, numBispecBins*sizeof(double3)));
+    gpuErrchk(cudaMalloc((void **)&da_2, numBispecBins*sizeof(double3)));
     gpuErrchk(cudaMalloc((void **)&dkvec, kvec.size()*sizeof(int4)));
     
     // Copy data to the GPU, this initializes dN_tri, dB_0 and dB_2 to zero
-    gpuErrchk(cudaMemcpy(dN_tri, N_tri.data(), numBisepcBins*sizeof(unsigned int), 
+    gpuErrchk(cudaMemcpy(dN_tri, N_tri.data(), numBispecBins*sizeof(unsigned int), 
                          cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(dB_0, B_0.data(), numBisepcBins*sizeof(double), cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(dB_2, B_2.data(), numBisepcBins*sizeof(double), cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(da_0, a_0.data(), numBisepcBins*sizeof(double3), cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(da_2, a_2.data(), numBisepcBins*sizeof(double3), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(dB_0, B_0.data(), numBispecBins*sizeof(double), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(dB_2, B_2.data(), numBispecBins*sizeof(double), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(da_0, a_0.data(), numBispecBins*sizeof(double3), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(da_2, a_2.data(), numBispecBins*sizeof(double3), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(dkvec, kvec.data(), kvec.size()*sizeof(int4), cudaMemcpyHostToDevice));
     
     int numBlocks1D = kvec.size()/32 + 1;
@@ -130,29 +135,29 @@ int main(int argc, char *argv[]) {
     double2 k_lim = {p.getd("k_min"), p.getd("k_max")};
     
     calcN_tri<<<num_blocks,num_threads>>>(da_0, dkvec, dN_tri, N_grid, kvec.size(), p.getd("Delta_k"),
-                                          numBisepcBins, k_lim);
+                                          numBispecBins, k_lim);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
     
     calcB_02<<<num_blocks,num_threads>>>(da_0, da_2, dkvec, dB_0, dB_2, N_grid, kvec.size(), 
-                                         p.getd("Delta_k"), numBisepcBins, k_lim);
+                                         p.getd("Delta_k"), numBispecBins, k_lim);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
     
     int normBlocks, normThreads;
-    if (numBisepcBins <= 1024) {
+    if (numBispecBins <= 1024) {
         normBlocks = 1;
         normThreads = numBispecBins;
     } else {
-        normBlocks = numBisepcBins/1024 + 1;
+        normBlocks = numBispecBins/1024 + 1;
         normThreads = 1024;
     }
-    normB_l<<<normBlocks,normThreads>>>(dB_0, dN_tri, gal_bk_nbw.z, numBisepcBins);
-    normB_l<<<normBlocks,normThreads>>>(dB_2, dN_tri, gal_bk_nbw.z, numBisepcBins);
+    normB_l<<<normBlocks,normThreads>>>(dB_0, dN_tri, gal_bk_nbw.z, numBispecBins);
+    normB_l<<<normBlocks,normThreads>>>(dB_2, dN_tri, gal_bk_nbw.z, numBispecBins);
     
-    gpuErrchk(cudaMemcpy(B_0.data(), dB_0, numBisepcBins*sizeof(double), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(B_0.data(), dB_0, numBispecBins*sizeof(double), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(B_2.data(), dB_2, numBispecBins*sizeof(double), cudaMemcpyDeviceToHost));
-    gpuErrchk(cudaMemcpy(N_tri.data(), dN_tri, numBisepcBins*sizeof(unsigned int), 
+    gpuErrchk(cudaMemcpy(N_tri.data(), dN_tri, numBispecBins*sizeof(unsigned int), 
                          cudaMemcpyDeviceToHost));
     
     writeBispectrumFile(p.gets("outfile"), B_0, B_2, N_tri, ks);
