@@ -124,10 +124,14 @@ __global__ void calcB_0(double3 *A_0, int4 *k_vec, double *B_0, int4 N_grid, int
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
         if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
-            double val = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
-            // TODO: Add error checking for bin number, e.g. if bin = -1 handle error
-            int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
-            atomicAdd(&B_0[bin], val);
+            if (A_0[k_k.w].z >= k_lim.x && A_0[k_k.w].z < k_lim.y) {
+                double val = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
+                // TODO: Add error checking for bin number, e.g. if bin = -1 handle error
+                int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
+                if (bin < numBins) {
+                    atomicAdd(&B_0[bin], val);
+                }
+            }
         }
     }
 }
@@ -146,11 +150,15 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *k_vec, double *B_0, d
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
         if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
-            double B0 = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
-            double B2 = realPart(A_2[k_i.w], A_0[k_j.w], A_0[k_k.w]);
-            int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
-            atomicAdd(&B_0[bin], B0);
-            atomicAdd(&B_2[bin], B2);
+            if (A_0[k_k.w].z >= k_lim.x && A_0[k_k.w].z < k_lim.y) {
+                double B0 = realPart(A_0[k_i.w], A_0[k_j.w], A_0[k_k.w]);
+                double B2 = realPart(A_2[k_i.w], A_0[k_j.w], A_0[k_k.w]);
+                int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
+                if (bin < numBins) {
+                    atomicAdd(&B_0[bin], B0);
+                    atomicAdd(&B_2[bin], B2);
+                }
+            }
         }
     }
 }
@@ -176,8 +184,12 @@ __global__ void calcN_tri(double3 *A_0, int4 *k_vec, unsigned int *N_tri, int4 N
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
         if (i.x >= 0 && i.y >= 0, && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
-            int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
-            atomicAdd(&N_tri[bin], 1);
+            if (A_0[k_k.w].z >= k_lim.x && A_0[k_k.w].z < k_lim.y) {
+                int bin = getBin(A_0[k_i.w].z, A_0[k_j.w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x);
+                if (bin < numBins) {
+                    atomicAdd(&N_tri[bin], 1);
+                }
+            }
         }
     }
 }
@@ -188,6 +200,39 @@ __global__ normB_l(double *B_l, unsigned int *N_tri, double norm, int numBins) {
     if (tid < numBins && N_tri[tid] > 0) {
         B_l[tid] /= (norm*N_tri[tid]);
     }
+}
+
+int getNumBispecBins(double k_min, double k_max, double Delta_k, std::vector<double3> &ks) {
+    int totBins = 0;
+    int N = (k_max - k_min)/Delta_k;
+    
+    for (int i = 0; i < N; ++i) {
+        double k_1 = k_min + (i + 0.5)*binWidth;
+        for (int j = i; j < N; ++j) {
+            double k_2 = k_min + (j + 0.5)*binWidth;
+            for (int k = j; k < N; ++k) {
+                double k_3 = k_min + (k + 0.5)*binWidth;
+                if (k_3 <= k_1 + k_2 && k_3 <= k_max) {
+                    totBins++;
+                    double3 kt = {k_1, k_2, k_3};
+                    ks.push_back(kt);
+                }
+            }
+        }
+    }
+    
+    return totBins;
+}
+
+void writeBispectrumFile(std::string file, std::vector<double> &B_0, std::vector<double> &B_2,
+                         std::vector<unsigned int> &N_tri, std::vector<double3> &ks) {
+    std::ofstream fout(file);
+    fout.precision(15); // TODO: Change to use <limits>
+    for (int i = 0; i < B_0.size(); ++i) {
+        fout << ks[i].x << " " << ks[i].y << " " << ks[i].z << " " << B_0[i] << " ";
+        fout << B_2[i] << " " << N_tri[i] << "\n";
+    }
+    fout.close();
 }
 
 #endif
