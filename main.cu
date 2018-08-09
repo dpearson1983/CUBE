@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
     
     int numBlocks1D = kvec.size()/32 + 1;
     dim3 num_threads(32,32);
-    dim3 num_blocks(numBlocks1D,numBlocks1D);
+    dim3 num_blocks(numBlocks1D,numBlocks1D/2 + 1);
     double2 k_lim = {p.getd("k_min"), p.getd("k_max")};
     
     calcN_tri<<<num_blocks,num_threads>>>(da_0, dkvec, dN_tri, N_grid, kvec.size(), p.getd("Delta_k"),

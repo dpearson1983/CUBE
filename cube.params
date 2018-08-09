@@ -1,0 +1,27 @@
+double H_0 = 67.74
+double Omega_M = 0.3089
+double Omega_L = 0.6911
+
+double k_min = 0.04
+double k_max = 0.168
+double delta_k = 0.008
+
+double z_min = 0.43
+double z_max = 0.7
+
+int Nx = 512
+int Ny = 1024
+int Nz = 512
+
+string dataFileType = DR12
+string ranFileType = DR12_ran
+
+string randomsFile = random0_DR12v5_CMASS_North.fits
+string dataFile = galaxy_DR12v5_CMASS_North.fits
+
+string wisdomFile = fftwWisdom.dat
+string shellBase = shell
+string shellExt = bin
+
+string pkFile = galaxy_DR12v5_CMASS_North_P0.dat
+string outFile = galaxy_DR12v5_CMASS_North_B0.dat
