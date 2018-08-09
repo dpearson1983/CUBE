@@ -6,7 +6,7 @@
 #include <CCfits/CCfits>
 #include <gsl/gsl_integration.h>
 #include "../include/file_io.h"
-#include "../include/tpods.h"
+#include <vector_types.h>
 #include "../include/galaxy.h"
 #include "../include/cosmology.h"
 
@@ -66,12 +66,12 @@ void getDR12Rans(std::string file, std::vector<galaxy> &gals, double z_min, doub
     }
 }
 
-vec3<double> getRMin(std::vector<galaxy> &gals, cosmology &cosmo, vec3<int> N, vec3<double> &L) {
-    vec3<double> r_min = {1E17, 1E17, 1E17};
-    vec3<double> r_max = {-1E17, -1E17, -1E17};
+double3 getRMin(std::vector<galaxy> &gals, cosmology &cosmo, int3 N, double3 &L) {
+    double3 r_min = {1E17, 1E17, 1E17};
+    double3 r_max = {-1E17, -1E17, -1E17};
     gsl_integration_workspace *ws = gsl_integration_workspace_alloc(10000000);
     for (size_t i = 0; i < gals.size(); ++i) {
-        vec3<double> pos = gals[i].get_unshifted_cart(cosmo, ws);
+        double3 pos = gals[i].get_unshifted_cart(cosmo, ws);
         if (pos.x < r_min.x) r_min.x = pos.x;
         if (pos.y < r_min.y) r_min.y = pos.y;
         if (pos.z < r_min.z) r_min.z = pos.z;
@@ -133,8 +133,8 @@ vec3<double> getRMin(std::vector<galaxy> &gals, cosmology &cosmo, vec3<int> N, v
     return r_min;
 }
 
-void readDR12(std::string file, std::vector<double> &delta, vec3<int> N, vec3<double> L, 
-              vec3<double> r_min, cosmology &cosmo, vec3<double> &pk_nbw, vec3<double> &bk_nbw, 
+void readDR12(std::string file, std::vector<double> &delta, int3 N, double3 L, 
+              double3 r_min, cosmology &cosmo, double3 &pk_nbw, double3 &bk_nbw, 
               double z_min, double z_max) {
     std::vector<galaxy> gals;
     getDR12Gals(file, gals, z_min, z_max);
@@ -146,8 +146,8 @@ void readDR12(std::string file, std::vector<double> &delta, vec3<int> N, vec3<do
     gsl_integration_workspace_free(ws);
 }
 
-void readDR12Ran(std::string file, std::vector<double> &delta, vec3<int> N, vec3<double> &L, 
-              vec3<double> &r_min, cosmology &cosmo, vec3<double> &pk_nbw, vec3<double> &bk_nbw, 
+void readDR12Ran(std::string file, std::vector<double> &delta, int3 N, double3 &L, 
+              double3 &r_min, cosmology &cosmo, double3 &pk_nbw, double3 &bk_nbw, 
               double z_min, double z_max) {
     std::vector<galaxy> rans;
     getDR12Rans(file, rans, z_min, z_max);
@@ -161,8 +161,8 @@ void readDR12Ran(std::string file, std::vector<double> &delta, vec3<int> N, vec3
     gsl_integration_workspace_free(ws);
 }
 
-void readPatchy(std::string file, std::vector<double> &delta, vec3<int> N, vec3<double> L, 
-                vec3<double> r_min, cosmology &cosmo, vec3<double> &pk_nbw, vec3<double> &bk_nbw,
+void readPatchy(std::string file, std::vector<double> &delta, int3 N, double3 L, 
+                double3 r_min, cosmology &cosmo, double3 &pk_nbw, double3 &bk_nbw,
                 double z_min, double z_max) {
     std::vector<galaxy> gals;
     
@@ -178,7 +178,7 @@ void readPatchy(std::string file, std::vector<double> &delta, vec3<int> N, vec3<
     }
     fin.close();
     
-//     vec3<double> r_min = getRMin(gals, cosmo, L);
+//     double3 r_min = getRMin(gals, cosmo, L);
     gsl_integration_workspace *ws = gsl_integration_workspace_alloc(10000000);
     for (size_t i = 0; i < gals.size(); ++i) {
         gals[i].bin(delta, N, L, r_min, cosmo, pk_nbw, bk_nbw, ws);
@@ -186,8 +186,8 @@ void readPatchy(std::string file, std::vector<double> &delta, vec3<int> N, vec3<
     gsl_integration_workspace_free(ws);
 }
 
-void readPatchyRan(std::string file, std::vector<double> &delta, vec3<int> N, vec3<double> &L, 
-                vec3<double> &r_min, cosmology &cosmo, vec3<double> &pk_nbw, vec3<double> &bk_nbw, 
+void readPatchyRan(std::string file, std::vector<double> &delta, int3 N, double3 &L, 
+                double3 &r_min, cosmology &cosmo, double3 &pk_nbw, double3 &bk_nbw, 
                 double z_min, double z_max) {
     std::vector<galaxy> rans;
     
@@ -228,8 +228,8 @@ void setFileType(std::string typeString, FileType &type) {
     }
 }
 
-void readFile(std::string file, std::vector<double> &delta, vec3<int> N, vec3<double> &L, 
-              vec3<double> &r_min, cosmology &cosmo, vec3<double> &pk_nbw, vec3<double> &bk_nbw,
+void readFile(std::string file, std::vector<double> &delta, int3 N, double3 &L, 
+              double3 &r_min, cosmology &cosmo, double3 &pk_nbw, double3 &bk_nbw,
               double z_min, double z_max, FileType type) {
     switch(type) {
         case dr12:
@@ -251,7 +251,7 @@ void readFile(std::string file, std::vector<double> &delta, vec3<int> N, vec3<do
     }
 }
 
-void writeBispectrumFile(std::string file, std::vector<vec3<double>> &ks, std::vector<double> &B) {
+void writeBispectrumFile(std::string file, std::vector<double3> &ks, std::vector<double> &B) {
     std::ofstream fout(file);
     fout.precision(15);
     for (size_t i = 0; i < B.size(); ++i) {
@@ -260,7 +260,7 @@ void writeBispectrumFile(std::string file, std::vector<vec3<double>> &ks, std::v
     fout.close();
 }
 
-void writeShellFile(std::string file, std::vector<double> &shell, vec3<int> N) {
+void writeShellFile(std::string file, std::vector<double> &shell, int3 N) {
     size_t N_tot = N.x*N.y*N.z;
     std::ofstream fout(file, std::ios::out|std::ios::binary);
     for (int i = 0; i < N.x; ++i) {

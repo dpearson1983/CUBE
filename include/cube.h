@@ -5,7 +5,7 @@
 #include <vector_types.h>
 #include <fftw3.h>
 
-int4 getSmallGridDimensions(double k_min, double k_max, double3 delta_k);
+int3 getSmallGridDimensions(double k_min, double k_max, double3 delta_k);
 
 void getSmallCube(std::vector<double3> &cube, int3 N_grid, fftw_complex *dk, int3 N, 
                   double k_min, double k_max, std::vector<double> &kx, std::vector<double> &ky, 

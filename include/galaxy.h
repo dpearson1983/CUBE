@@ -4,25 +4,25 @@
 #include <vector>
 #include <gsl/gsl_integration.h>
 #include "cosmology.h"
-#include "tpods.h"
+#include <vector_types.h>
 
 class galaxy{
     double ra, dec, red, w, nbar;
-    vec3<double> cart;
+    double3 cart;
     bool cart_set;
     
     public:
         galaxy(double RA, double DEC, double RED, double NZ, double W);
         
-        void bin(std::vector<double> &delta, vec3<int> N, vec3<double> L, vec3<double> r_min,
-                 cosmology &cosmo, vec3<double> &pk_nbw, vec3<double> &bk_nbw, 
+        void bin(std::vector<double> &delta, int3 N, double3 L, double3 r_min,
+                 cosmology &cosmo, double3 &pk_nbw, double3 &bk_nbw, 
                  gsl_integration_workspace *ws);
         
-        void set_cartesian(cosmology &cosmo, vec3<double> r_min, gsl_integration_workspace *ws);
+        void set_cartesian(cosmology &cosmo, double3 r_min, gsl_integration_workspace *ws);
         
-        vec3<double> get_unshifted_cart(cosmology &cosmo, gsl_integration_workspace *ws);
+        double3 get_unshifted_cart(cosmology &cosmo, gsl_integration_workspace *ws);
     
-        vec3<double> get_cart();
+        double3 get_cart();
 };
 
 #endif

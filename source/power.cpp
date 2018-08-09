@@ -5,7 +5,7 @@
 #include "../include/power.h"
 
 void binFrequencies(fftw_complex *delta, std::vector<double> &P, std::vector<int> &N_k,
-                    vec3<int> N, std::vector<double> &kx, std::vector<double> &ky, 
+                    int3 N, std::vector<double> &kx, std::vector<double> &ky, 
                     std::vector<double> &kz, double delta_k, double k_min, double k_max, 
                     double SN) {
     for (int i = 0; i < N.x; ++i) {

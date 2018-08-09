@@ -3,7 +3,7 @@
 #include <cmath>
 #include <fftw3.h>
 #include <omp.h>
-#include "../include/tpods.h"
+#include <vector_types.h>
 
 double sinc(double x) {
     if (x != 0) {
@@ -13,12 +13,12 @@ double sinc(double x) {
     }
 }
 
-double CICgridCorrection(double kx, double ky, double kz, vec3<int> N, vec3<double> L) {
+double CICgridCorrection(double kx, double ky, double kz, int3 N, double3 L) {
     double prodSinc = 1.0/(sinc(0.5*kx*L.x/N.x)*sinc(0.5*ky*L.y/N.y)*sinc(0.5*kz*L.z/N.z));
     return prodSinc*prodSinc;
 }
 
-void CICbinningCorrection(fftw_complex *delta, vec3<int> N, vec3<double> L, std::vector<double> &kx,
+void CICbinningCorrection(fftw_complex *delta, int3 N, double3 L, std::vector<double> &kx,
                           std::vector<double> &ky, std::vector<double> &kz) {
 #pragma omp parallel for
     for (int i = 0; i < N.x; ++i) {
@@ -32,13 +32,13 @@ void CICbinningCorrection(fftw_complex *delta, vec3<int> N, vec3<double> L, std:
     }
 }
 
-void getCICInfo(vec3<double> pos, const vec3<int> &N, const vec3<double> &L, 
+void getCICInfo(double3 pos, const int3 &N, const double3 &L, 
                 std::vector<size_t> &indices, std::vector<double> &weights) {
-    vec3<double> del_r = {L.x/N.x, L.y/N.y, L.z/N.z};
-    vec3<int> ngp = {int(pos.x/del_r.x), int(pos.y/del_r.y), int(pos.z/del_r.z)};
-    vec3<double> r_ngp = {(ngp.x + 0.5)*del_r.x, (ngp.y + 0.5)*del_r.y, (ngp.z + 0.5)*del_r.z};
-    vec3<double> dr = {pos.x - r_ngp.x, pos.y - r_ngp.y, pos.z - r_ngp.z};
-    vec3<int> shift;
+    double3 del_r = {L.x/N.x, L.y/N.y, L.z/N.z};
+    int3 ngp = {int(pos.x/del_r.x), int(pos.y/del_r.y), int(pos.z/del_r.z)};
+    double3 r_ngp = {(ngp.x + 0.5)*del_r.x, (ngp.y + 0.5)*del_r.y, (ngp.z + 0.5)*del_r.z};
+    double3 dr = {pos.x - r_ngp.x, pos.y - r_ngp.y, pos.z - r_ngp.z};
+    int3 shift;
     if (dr.x != 0) shift.x = int(dr.x/fabs(dr.x));
     else shift.x = 0;
     if (dr.y != 0) shift.y = int(dr.y/fabs(dr.y));

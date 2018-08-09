@@ -5,13 +5,13 @@
 #include "../include/cic.h"
 #include "../include/galaxy.h"
 #include "../include/cosmology.h"
-#include "../include/tpods.h"
+#include <vector_types.h>
 
 #ifndef PI
 #define PI 3.1415926535897932384626433832795
 #endif
 
-void galaxy::set_cartesian(cosmology &cosmo, vec3<double> r_min, gsl_integration_workspace *ws) {
+void galaxy::set_cartesian(cosmology &cosmo, double3 r_min, gsl_integration_workspace *ws) {
     double D = cosmo.comoving_distance(galaxy::red, ws);
     
     galaxy::cart.x = D*cos(galaxy::dec*PI/180.0)*cos(galaxy::ra*PI/180.0) - r_min.x;
@@ -21,10 +21,10 @@ void galaxy::set_cartesian(cosmology &cosmo, vec3<double> r_min, gsl_integration
     galaxy::cart_set = true;
 }
 
-vec3<double> galaxy::get_unshifted_cart(cosmology &cosmo, gsl_integration_workspace *ws) {
+double3 galaxy::get_unshifted_cart(cosmology &cosmo, gsl_integration_workspace *ws) {
     double D = cosmo.comoving_distance(galaxy::red, ws);
     
-    vec3<double> cart;
+    double3 cart;
     
     cart.x = D*cos(galaxy::dec*PI/180.0)*cos(galaxy::ra*PI/180.0);
     cart.y = D*cos(galaxy::dec*PI/180.0)*sin(galaxy::ra*PI/180.0);
@@ -33,7 +33,7 @@ vec3<double> galaxy::get_unshifted_cart(cosmology &cosmo, gsl_integration_worksp
     return cart;
 }
 
-vec3<double> galaxy::get_cart() {
+double3 galaxy::get_cart() {
     return galaxy::cart;
 }
 
@@ -46,8 +46,8 @@ galaxy::galaxy(double RA, double DEC, double RED, double NZ, double W) {
     galaxy::cart_set = false;
 }
 
-void galaxy::bin(std::vector<double> &delta, vec3<int> N, vec3<double> L, vec3<double> r_min,
-                 cosmology &cosmo, vec3<double> &pk_nbw, vec3<double> &bk_nbw, 
+void galaxy::bin(std::vector<double> &delta, int3 N, double3 L, double3 r_min,
+                 cosmology &cosmo, double3 &pk_nbw, double3 &bk_nbw, 
                  gsl_integration_workspace *ws) {
     if (!galaxy::cart_set) galaxy::set_cartesian(cosmo, r_min, ws);
     

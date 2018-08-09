@@ -9,6 +9,8 @@
 #include "include/bispec.h"
 #include "include/transformers.h"
 #include "include/power.h"
+#include "include/cube.h"
+#include "include/line_of_sight.h"
 #include "include/harppi.h"
 
 int main(int argc, char *argv[]) {
@@ -22,16 +24,16 @@ int main(int argc, char *argv[]) {
     cosmology cosmo(p.getd("H_0"), p.getd("Omega_M"), p.getd("Omega_L"));
     
     // Storage for values
-    vec3<double> gal_pk_nbw = {0.0, 0.0, 0.0};
-    vec3<double> gal_bk_nbw = {0.0, 0.0, 0.0};
-    vec3<double> ran_pk_nbw = {0.0, 0.0, 0.0};
-    vec3<double> ran_bk_nbw = {0.0, 0.0, 0.0};
+    double3 gal_pk_nbw = {0.0, 0.0, 0.0};
+    double3 gal_bk_nbw = {0.0, 0.0, 0.0};
+    double3 ran_pk_nbw = {0.0, 0.0, 0.0};
+    double3 ran_bk_nbw = {0.0, 0.0, 0.0};
     
     // Both r_min and L will be set automatically when reading in randoms
-    vec3<double> r_min;
-    vec3<double> L;
+    double3 r_min;
+    double3 L;
     
-    vec3<int> N = {p.geti("Nx"), p.geti("Ny"), p.geti("Nz")};
+    int3 N = {p.geti("Nx"), p.geti("Ny"), p.geti("Nz")};
     
     std::cout << "Setting file type variables..." << std::endl;
     FileType dataFileType, ranFileType;
@@ -79,4 +81,6 @@ int main(int argc, char *argv[]) {
     get_A2(delta, A_2, N, L, r_min);
     
     // TODO: Setup up small cubes, call GPU functions, output result.
+    
+    int3 N_grid = getSmallGridDimensions(p.getd("k_min"), p.getd("k_max"), 
 }
