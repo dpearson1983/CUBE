@@ -104,6 +104,7 @@ int main(int argc, char *argv[]) {
     
     std::vector<double3> ks;
     int numBispecBins = getNumBispecBins(p.getd("k_min"), p.getd("k_max"), p.getd("Delta_k"), ks);
+    std::cout << "Number of bispectrum bins: " << numBispecBins << std::endl;
     std::vector<unsigned int> N_tri(numBispecBins);
     std::vector<double> B_0(numBispecBins);
     std::vector<double> B_2(numBispecBins);

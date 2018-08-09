@@ -9,6 +9,9 @@ VXXFLAGS = -arch=sm_52 -ccbin=cuda-g++ --compiler-options "$(LIBGSL) $(LIBFFTW) 
 build: cic cosmology cube file_io galaxy harppi line_of_sight power transformers main.cu
 	$(VXX) $(VXXFLAGS) -O3 -o $(HOME)/bin/cube main.cu obj/*.o
 	
+debug_build: cic cosmology cube file_io galaxy harppi line_of_sight power transformers main.cu
+	$(VXX) $(VXXFLAGS) -g -G -o $(HOME)/bin/cube main.cu obj/*.o
+	
 cic: source/cic.cpp
 	mkdir -p obj
 	$(CXX) $(LIBGSL) $(LIBFFTW) $(CXXFLAGS) -c -o obj/cic.o source/cic.cpp

@@ -107,11 +107,6 @@ __global__ void calcB_0(double3 *A_0, int4 *kvec, double *B_0, int3 N_grid, int 
                         double binWidth, int numBins, double2 k_lim) {
     int k_j = threadIdx.x + blockIdx.x*blockDim.x;
     int k_i = threadIdx.y + blockIdx.y*blockDim.y;
-    // TODO: Look into how this stacking will affect the dimensionality of the 2D grid of blocks.
-    if (k_j < k_i) {
-        k_i = N_kvec - k_i;
-        k_j = N_kvec - 1 - k_j;
-    }
     
     // TODO: Change to a variable that is passed to the function instead of calculating each time.
     //       This is likely a fairly minor optimization, but is an optimization, nonetheless.
@@ -120,6 +115,10 @@ __global__ void calcB_0(double3 *A_0, int4 *kvec, double *B_0, int3 N_grid, int 
     int zShift = N_grid.z/2;
     
     if (k_j < N_kvec && k_i < N_kvec) {
+        if (k_j < k_i) {
+            k_i = N_kvec - k_i;
+            k_j = N_kvec - 1 - k_j;
+        }
         int4 k_k = {-kvec[k_i].x - kvec[k_j].x, -kvec[k_i].y - kvec[k_j].y, -kvec[k_i].z - kvec[k_j].z, 0};
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
         if (i.x >= 0 && i.y >= 0 && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
@@ -140,10 +139,6 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *kvec, double *B_0, do
                          int3 N_grid, int N_kvec, double binWidth, int numBins, double2 k_lim) {
     int k_j = threadIdx.x + blockIdx.x*blockDim.x;
     int k_i = threadIdx.y + blockIdx.y*blockDim.y;
-    if (k_j < k_i) {
-        k_i = N_kvec - k_i;
-        k_j = N_kvec - 1 - k_j;
-    }
     
     // TODO: Change to a variable that is passed to the function instead of calculating each time.
     //       This is likely a fairly minor optimization, but is an optimization, nonetheless.
@@ -152,6 +147,10 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *kvec, double *B_0, do
     int zShift = N_grid.z/2;
     
     if (k_j < N_kvec && k_i < N_kvec) {
+        if (k_j < k_i) {
+            k_i = N_kvec - k_i;
+            k_j = N_kvec - 1 - k_j;
+        }
         int4 k_k = {-kvec[k_i].x - kvec[k_j].x, -kvec[k_i].y - kvec[k_j].y, -kvec[k_i].z - kvec[k_j].z, 0};
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
         if (i.x >= 0 && i.y >= 0 && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
@@ -173,11 +172,6 @@ __global__ void calcN_tri(double3 *A_0, int4 *kvec, unsigned int *N_tri, int3 N_
                           double binWidth, int numBins, double2 k_lim) {
     int k_j = threadIdx.x + blockIdx.x*blockDim.x;
     int k_i = threadIdx.y + blockIdx.y*blockDim.y;
-    // TODO: Look into how this stacking will affect the dimensionality of the 2D grid of blocks.
-    if (k_j < k_i) {
-        k_i = N_kvec - k_i;
-        k_j = N_kvec - 1 - k_j;
-    }
     
     // TODO: Change to a variable that is passed to the function instead of calculating each time.
     //       This is likely a fairly minor optimization, but is an optimization, nonetheless.
@@ -186,6 +180,10 @@ __global__ void calcN_tri(double3 *A_0, int4 *kvec, unsigned int *N_tri, int3 N_
     int zShift = N_grid.z/2;
     
     if (k_j < N_kvec && k_i < N_kvec) {
+        if (k_j < k_i) {
+            k_i = N_kvec - k_i;
+            k_j = N_kvec - 1 - k_j;
+        }
         int4 k_k = {-kvec[k_i].x - kvec[k_j].x, -kvec[k_i].y - kvec[k_j].y, -kvec[k_i].z - kvec[k_j].z, 0};
         int3 i = {k_k.x + xShift, k_k.y + yShift, k_k.z + zShift};
         if (i.x >= 0 && i.y >= 0 && i.z >=0 && i.x < N_grid.x && i.y < N_grid.y && i.z < N_grid.z) {
