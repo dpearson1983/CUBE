@@ -47,6 +47,10 @@ __device__ int getBin(double k1, double k2, double k3, double binWidth, int N, d
     swapIfGreater(k1, k3);
     swapIfGreater(k2, k3);
     
+    int i_k1 = (k1 - k_min)/binWidth - 0.5;
+    int j_k2 = (k2 - k_min)/binWidth - 0.5;
+    int k_k3 = (k3 - k_min)/binWidth - 0.5;
+    
     int index = 0;
     for (int i = 0; i < N; ++i) {
         double k_1 = k_min + (i + 0.5)*binWidth;
@@ -55,7 +59,7 @@ __device__ int getBin(double k1, double k2, double k3, double binWidth, int N, d
             for (int k = j; k < N; ++k) {
                 double k_3 = k_min + (k + 0.5)*binWidth;
                 if (k_3 <= k_1 + k_2 && k_3 <= k_max) {
-                    if (k_1 == k1 && k_2 == k2 && k_3 == k3) {
+                    if (i == i_k1 && j == j_k2 && k == k_k3) {
                         return index;
                     } else {
                         index++;
@@ -190,9 +194,9 @@ __global__ void calcN_tri(double3 *A_0, int4 *kvec, unsigned int *N_tri, int3 N_
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
             if (A_0[k_k.w].z >= k_lim.x && A_0[k_k.w].z < k_lim.y) {
                 int bin = getBin(A_0[kvec[k_i].w].z, A_0[kvec[k_j].w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x, k_lim.y);
-//                 if (bin < numBins) {
+                if (bin < numBins && bin >= 0) {
                     atomicAdd(&N_tri[bin], 1);
-//                 }
+                }
             }
         }
     }

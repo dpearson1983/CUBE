@@ -37,13 +37,13 @@ void getSmallCube(std::vector<double3> &cube, int3 N_grid, fftw_complex *dk, int
     }
     
     for (int i = 0; i < N_grid.x; ++i) {
-        double k_x = (i - (N_grid.x - 1))*delta_k.x;
+        double k_x = (i - (N_grid.x/2 - 1))*delta_k.x;
         int i2 = kMatch(k_x, kx, delta_k.x);
         for (int j = 0; j < N_grid.y; ++j) {
-            double k_y = (j - (N_grid.y - 1))*delta_k.y;
+            double k_y = (j - (N_grid.y/2 - 1))*delta_k.y;
             int j2 = kMatch(k_y, ky, delta_k.y);
             for (int k = 0; k < N_grid.z; ++k) {
-                double k_z = (k - (N_grid.z - 1))*delta_k.z;
+                double k_z = (k - (N_grid.z/2 - 1))*delta_k.z;
                 int k2 = kMatch(k_z, kz, delta_k.z);
                 int index1 = k + N_grid.z*(j + N_grid.y*i);
                 double k_mag = sqrt(k_x*k_x + k_y*k_y + k_z*k_z);
@@ -80,13 +80,13 @@ void getSmallCube(std::vector<double3> &cube, int3 N_grid, fftw_complex *dk, int
     }
     
     for (int i = 0; i < N_grid.x; ++i) {
-        double k_x = (i - (N_grid.x - 1))*delta_k.x;
+        double k_x = (i - (N_grid.x/2 - 1))*delta_k.x;
         int i2 = kMatch(k_x, kx, delta_k.x);
         for (int j = 0; j < N_grid.y; ++j) {
-            double k_y = (j - (N_grid.y - 1))*delta_k.y;
+            double k_y = (j - (N_grid.y/2 - 1))*delta_k.y;
             int j2 = kMatch(k_y, ky, delta_k.y);
             for (int k = 0; k < N_grid.z; ++k) {
-                double k_z = (k - (N_grid.z - 1))*delta_k.z;
+                double k_z = (k - (N_grid.z/2 - 1))*delta_k.z;
                 int k2 = kMatch(k_z, kz, delta_k.z);
                 int index1 = k + N_grid.z*(j + N_grid.y*i);
                 double k_mag = sqrt(k_x*k_x + k_y*k_y + k_z*k_z);

@@ -103,6 +103,8 @@ int main(int argc, char *argv[]) {
     getSmallCube(a_2, N_grid, (fftw_complex *)A_2.data(), N, p.getd("k_min"), p.getd("k_max"), kx, ky,
                  kz, delta_k);
     
+    std::cout << a_0[42].x << ", " << a_2[42].x << std::endl;
+    
     std::ofstream fout("kvec.dat");
     for (size_t i = 0; i < kvec.size(); ++i) {
         fout << kvec[i].x << " " << kvec[i].y << " " << kvec[i].z << " " << kvec[i].w << "\n";
@@ -112,7 +114,7 @@ int main(int argc, char *argv[]) {
     std::vector<double3> ks;
     int numBispecBins = getNumBispecBins(p.getd("k_min"), p.getd("k_max"), p.getd("Delta_k"), ks);
     std::cout << "Number of bispectrum bins: " << numBispecBins << std::endl;
-    std::vector<unsigned int> N_tri(numBispecBins);
+    std::vector<unsigned int> N_tri(numBispecBins + 1);
     std::vector<double> B_0(numBispecBins);
     std::vector<double> B_2(numBispecBins);
     unsigned int *dN_tri;
@@ -121,7 +123,7 @@ int main(int argc, char *argv[]) {
     int4 *dkvec;
     
     // Allocate GPU memory
-    gpuErrchk(cudaMalloc((void **)&dN_tri, numBispecBins*sizeof(unsigned int)));
+    gpuErrchk(cudaMalloc((void **)&dN_tri, N_tri.size()*sizeof(unsigned int)));
     gpuErrchk(cudaMalloc((void **)&dB_0, numBispecBins*sizeof(double)));
     gpuErrchk(cudaMalloc((void **)&dB_2, numBispecBins*sizeof(double)));
     gpuErrchk(cudaMalloc((void **)&da_0, N_grid.x*N_grid.y*N_grid.z*sizeof(double3)));
@@ -129,7 +131,7 @@ int main(int argc, char *argv[]) {
     gpuErrchk(cudaMalloc((void **)&dkvec, kvec.size()*sizeof(int4)));
     
     // Copy data to the GPU, this initializes dN_tri, dB_0 and dB_2 to zero
-    gpuErrchk(cudaMemcpy(dN_tri, N_tri.data(), numBispecBins*sizeof(unsigned int), 
+    gpuErrchk(cudaMemcpy(dN_tri, N_tri.data(), N_tri.size()*sizeof(unsigned int), 
                          cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(dB_0, B_0.data(), numBispecBins*sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(dB_2, B_2.data(), numBispecBins*sizeof(double), cudaMemcpyHostToDevice));
@@ -168,8 +170,10 @@ int main(int argc, char *argv[]) {
     
     gpuErrchk(cudaMemcpy(B_0.data(), dB_0, numBispecBins*sizeof(double), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(B_2.data(), dB_2, numBispecBins*sizeof(double), cudaMemcpyDeviceToHost));
-    gpuErrchk(cudaMemcpy(N_tri.data(), dN_tri, numBispecBins*sizeof(unsigned int), 
+    gpuErrchk(cudaMemcpy(N_tri.data(), dN_tri, N_tri.size()*sizeof(unsigned int), 
                          cudaMemcpyDeviceToHost));
+    
+    std::cout << N_tri[numBispecBins] << std::endl;
     
     writeBispectrumFile(p.gets("outFile"), B_0, B_2, N_tri, ks);
     
