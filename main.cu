@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
     gpuErrchk(cudaMemcpy(N_tri.data(), dN_tri, numBispecBins*sizeof(unsigned int), 
                          cudaMemcpyDeviceToHost));
     
-    writeBispectrumFile(p.gets("outfile"), B_0, B_2, N_tri, ks);
+    writeBispectrumFile(p.gets("outFile"), B_0, B_2, N_tri, ks);
     
     gpuErrchk(cudaFree(dB_0));
     gpuErrchk(cudaFree(dB_2));
