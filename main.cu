@@ -179,4 +179,6 @@ int main(int argc, char *argv[]) {
     gpuErrchk(cudaFree(da_2));
     gpuErrchk(cudaFree(dkvec));
     gpuErrchk(cudaFree(dN_tri));
+    
+    return 0;
 }

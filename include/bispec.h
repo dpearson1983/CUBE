@@ -190,9 +190,9 @@ __global__ void calcN_tri(double3 *A_0, int4 *kvec, unsigned int *N_tri, int3 N_
             k_k.w = i.z + N_grid.z*(i.y + N_grid.y*i.x);
             if (A_0[k_k.w].z >= k_lim.x && A_0[k_k.w].z < k_lim.y) {
                 int bin = getBin(A_0[kvec[k_i].w].z, A_0[kvec[k_j].w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x, k_lim.y);
-                if (bin < numBins) {
+//                 if (bin < numBins) {
                     atomicAdd(&N_tri[bin], 1);
-                }
+//                 }
             }
         }
     }
