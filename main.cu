@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
     
     double3 delta_k = {(2.0*PI)/L.x, (2.0*PI)/L.y, (2.0*PI)/L.z};
     int3 N_grid = getSmallGridDimensions(p.getd("k_min"), p.getd("k_max"), delta_k);
+    std::cout << N_grid.x << "x" << N_grid.y << "x" << N_grid.z << std::endl;
     
     std::vector<double3> a_0(N_grid.x*N_grid.y*N_grid.z);
     std::vector<double3> a_2(N_grid.x*N_grid.y*N_grid.z);
@@ -101,6 +102,12 @@ int main(int argc, char *argv[]) {
                  kz, delta_k, kvec);
     getSmallCube(a_2, N_grid, (fftw_complex *)A_2.data(), N, p.getd("k_min"), p.getd("k_max"), kx, ky,
                  kz, delta_k);
+    
+    std::ofstream fout("kvec.dat");
+    for (size_t i = 0; i < kvec.size(); ++i) {
+        fout << kvec[i].x << " " << kvec[i].y << " " << kvec[i].z << " " << kvec[i].w << "\n";
+    }
+    fout.close();
     
     std::vector<double3> ks;
     int numBispecBins = getNumBispecBins(p.getd("k_min"), p.getd("k_max"), p.getd("Delta_k"), ks);
@@ -134,6 +141,7 @@ int main(int argc, char *argv[]) {
     dim3 num_threads(32,32);
     dim3 num_blocks(numBlocks1D,numBlocks1D/2 + 1);
     double2 k_lim = {p.getd("k_min"), p.getd("k_max")};
+    std::cout << num_blocks.x << " " << num_blocks.y << std::endl;
     
     calcN_tri<<<num_blocks,num_threads>>>(da_0, dkvec, dN_tri, N_grid, kvec.size(), p.getd("Delta_k"),
                                           numBispecBins, k_lim);
