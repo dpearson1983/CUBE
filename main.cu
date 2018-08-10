@@ -124,8 +124,8 @@ int main(int argc, char *argv[]) {
     gpuErrchk(cudaMalloc((void **)&dN_tri, numBispecBins*sizeof(unsigned int)));
     gpuErrchk(cudaMalloc((void **)&dB_0, numBispecBins*sizeof(double)));
     gpuErrchk(cudaMalloc((void **)&dB_2, numBispecBins*sizeof(double)));
-    gpuErrchk(cudaMalloc((void **)&da_0, numBispecBins*sizeof(double3)));
-    gpuErrchk(cudaMalloc((void **)&da_2, numBispecBins*sizeof(double3)));
+    gpuErrchk(cudaMalloc((void **)&da_0, N_grid.x*N_grid.y*N_grid.z*sizeof(double3)));
+    gpuErrchk(cudaMalloc((void **)&da_2, N_grid.x*N_grid.y*N_grid.z*sizeof(double3)));
     gpuErrchk(cudaMalloc((void **)&dkvec, kvec.size()*sizeof(int4)));
     
     // Copy data to the GPU, this initializes dN_tri, dB_0 and dB_2 to zero
@@ -133,8 +133,10 @@ int main(int argc, char *argv[]) {
                          cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(dB_0, B_0.data(), numBispecBins*sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(dB_2, B_2.data(), numBispecBins*sizeof(double), cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(da_0, a_0.data(), numBispecBins*sizeof(double3), cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(da_2, a_2.data(), numBispecBins*sizeof(double3), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(da_0, a_0.data(), N_grid.x*N_grid.y*N_grid.z*sizeof(double3), 
+                         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(da_2, a_2.data(), N_grid.x*N_grid.y*N_grid.z*sizeof(double3), 
+                         cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(dkvec, kvec.data(), kvec.size()*sizeof(int4), cudaMemcpyHostToDevice));
     
     int numBlocks1D = kvec.size()/32 + 1;
