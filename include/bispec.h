@@ -172,10 +172,105 @@ __global__ void calcB_02(double3 *A_0, double3 *A_2, int4 *kvec, double *B_0, do
     }
 }
 
+__global__ void calcB0(double3 *A_0, int4 *kvec, double *Bk, int3 N_grid,
+                       int N, double binWidth, int numBins, double2 k_lim) {
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    int xShift = N_grid.x/2;
+    int yShift = N_grid.y/2;
+    int zShift = N_grid.z/2;
+    
+    __shared__ double Bk_local[691];
+    if (tid < 691)
+        Bk_local[tid] = 0;
+    __syncthreads();
+    
+    if (tid < N) {
+        int4 k_1 = kvec[tid];
+        k_1.x *= -1;
+        k_1.y *= -1;
+        k_1.z *= -1;
+        double3 dk_1 = A_0[k_1.w];
+        for (int i = tid; i < N; ++i) {
+            int4 k_2 = kvec[i];
+            double3 dk_2 = A_0[k_2.w];
+            int4 k_3 = {k_1.x - k_2.x, k_1.y - k_2.y, k_1.z - k_2.z, 0};
+            int i3, j3, k3;
+            i3 = k_3.x + xShift;
+            j3 = k_3.y + yShift;
+            k3 = k_3.z + zShift;
+            if (i3 >= 0 && j3 >= 0 && k3 >= 0 && i3 < N_grid.x && j3 < N_grid.y && k3 < N_grid.z) {
+                k_3.w = k3 + N_grid.z*(j3 + N_grid.y*i3);
+                double3 dk_3 = A_0[k_3.w];
+                if (dk_3.z < k_lim.y && dk_3.z >= k_lim.x) {
+                    double val = (dk_1.x*dk_2.x*dk_3.x - dk_1.x*dk_2.y*dk_3.y - dk_1.y*dk_2.x*dk_3.y - dk_1.y*dk_2.y*dk_3.x);
+                    int bin = getBin(dk_1.z, dk_2.z, dk_3.z, binWidth, numBins, k_lim.x, k_lim.y);
+                    atomicAdd(&Bk_local[bin], val);
+                }
+            }
+        }
+        __syncthreads();
+        
+        if (tid < 691) {
+                atomicAdd(&Bk[tid], Bk_local[tid]);
+        }
+    }
+}
+
+__global__ void calcB2(double3 *A_0, double3 *A_2, int4 *kvec, double *Bk, int3 N_grid,
+                       int N, double binWidth, int numBins, double2 k_lim) {
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    int xShift = N_grid.x/2;
+    int yShift = N_grid.y/2;
+    int zShift = N_grid.z/2;
+    
+    __shared__ double Bk_local[691];
+    if (tid < 691)
+        Bk_local[tid] = 0;
+    __syncthreads();
+    
+    if (tid < N) {
+        int4 k_1 = kvec[tid];
+        k_1.x *= -1;
+        k_1.y *= -1;
+        k_1.z *= -1;
+        double3 dk_1 = A_2[k_1.w];
+        for (int i = tid; i < N; ++i) {
+            int4 k_2 = kvec[i];
+            double3 dk_2 = A_0[k_2.w];
+            int4 k_3 = {k_1.x - k_2.x, k_1.y - k_2.y, k_1.z - k_2.z, 0};
+            int i3, j3, k3;
+            i3 = k_3.x + xShift;
+            j3 = k_3.y + yShift;
+            k3 = k_3.z + zShift;
+            if (i3 >= 0 && j3 >= 0 && k3 >= 0 && i3 < N_grid.x && j3 < N_grid.y && k3 < N_grid.z) {
+                k_3.w = k3 + N_grid.z*(j3 + N_grid.y*i3);
+                double3 dk_3 = A_0[k_3.w];
+                if (dk_3.z < k_lim.y && dk_3.z >= k_lim.x) {
+                    double val = (dk_1.x*dk_2.x*dk_3.x - dk_1.x*dk_2.y*dk_3.y - dk_1.y*dk_2.x*dk_3.y - dk_1.y*dk_2.y*dk_3.x);
+                    int bin = getBin(dk_1.z, dk_2.z, dk_3.z, binWidth, numBins, k_lim.x, k_lim.y);
+                    atomicAdd(&Bk_local[bin], val);
+                }
+            }
+        }
+        __syncthreads();
+        
+        if (tid < 691) {
+                atomicAdd(&Bk[tid], Bk_local[tid]);
+        }
+    }
+}
+
 __global__ void calcN_tri(double3 *A_0, int4 *kvec, unsigned int *N_tri, int3 N_grid, int N_kvec,
                           double binWidth, int numBins, double2 k_lim) {
     int k_j = threadIdx.x + blockIdx.x*blockDim.x;
     int k_i = threadIdx.y + blockIdx.y*blockDim.y;
+    int local_tid = threadIdx.y + blockDim.y*threadIdx.x;
+    
+    __shared__ unsigned int Ntri_local[691];
+    if (local_tid < 691) Ntri_local[local_tid] = 0;
+    
     
     // TODO: Change to a variable that is passed to the function instead of calculating each time.
     //       This is likely a fairly minor optimization, but is an optimization, nonetheless.
@@ -195,11 +290,13 @@ __global__ void calcN_tri(double3 *A_0, int4 *kvec, unsigned int *N_tri, int3 N_
             if (A_0[k_k.w].z >= k_lim.x && A_0[k_k.w].z < k_lim.y) {
                 int bin = getBin(A_0[kvec[k_i].w].z, A_0[kvec[k_j].w].z, A_0[k_k.w].z, binWidth, numBins, k_lim.x, k_lim.y);
                 if (bin < numBins && bin >= 0) {
-                    atomicAdd(&N_tri[bin], 1);
+                    atomicAdd(&Ntri_local[bin], 1);
                 }
             }
         }
     }
+    
+    if (local_tid < 691) atomicAdd(&N_tri[local_tid], Ntri_local[local_tid]);
 }
 
 __global__ void normB_l(double *B_l, unsigned int *N_tri, double norm, int numBins) {
@@ -207,6 +304,47 @@ __global__ void normB_l(double *B_l, unsigned int *N_tri, double norm, int numBi
     
     if (tid < numBins && N_tri[tid] > 0) {
         B_l[tid] /= (norm*N_tri[tid]);
+    }
+}
+
+__global__ void calcNtri(double3 *A_0, int4 *k, unsigned int *N_tri, int3 N_grid, int N, 
+                         float binWidth, int numBins, double2 k_lim) {
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    int xShift = N_grid.x/2;
+    int yShift = N_grid.y/2;
+    int zShift = N_grid.z/2;
+    
+    __shared__ unsigned int Ntri_local[691];
+    if (tid < 691) {
+        Ntri_local[tid] = 0;
+    }
+    __syncthreads();
+    
+    if (tid < N) {
+        int4 k_1 = k[tid];
+        double3 dk_1 = A_0[k_1.w];
+        for (int i = tid; i < N; ++i) {
+            int4 k_2 = k[i];
+            double3 dk_2 = A_0[k_2.w];
+            int4 k_3 = {-k_1.x - k_2.x, -k_1.y - k_2.y, -k_1.z - k_2.z, 0};
+            int i3 = k_3.x + xShift;
+            int j3 = k_3.y + yShift;
+            int k3 = k_3.z + zShift;
+            if (i3 >= 0 && j3 >= 0 && k3 >= 0 && i3 < N_grid.x && j3 < N_grid.y && k3 < N_grid.z) {
+                k_3.w = k3 + N_grid.z*(j3 + N_grid.y*i3);
+                double3 dk_3 = A_0[k_3.w];
+                if (dk_3.z < k_lim.y && dk_3.z >= k_lim.x) {
+                    int bin = getBin(dk_1.z, dk_2.z, dk_3.z, binWidth, numBins, k_lim.x, k_lim.y);
+                    atomicAdd(&Ntri_local[bin], 1);
+                }
+            }
+        }
+        __syncthreads();
+
+        if (tid < 691) {
+            atomicAdd(&N_tri[tid], Ntri_local[tid]);
+        }
     }
 }
 
