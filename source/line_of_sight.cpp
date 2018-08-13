@@ -75,7 +75,7 @@ void get_A2(std::vector<double> &dr, std::vector<double> &A_2, int3 N, double3 L
                 double r_z = r_min.z + (k + 0.5)*del_r.z;
                 double r_magsq = r_x*r_x + r_y*r_y+ r_z*r_z;
                 int index1 = k + N.z*(j + N.y*i);
-                int index2 = k + 2*(N.z/2 + 1)*(j + N.y*j);
+                int index2 = k + 2*(N.z/2 + 1)*(j + N.y*i);
                 
                 Bxx[index2] = (r_x*r_x*dr[index1])/r_magsq;
                 Byy[index2] = (r_y*r_y*dr[index1])/r_magsq;

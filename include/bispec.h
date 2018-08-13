@@ -6,6 +6,9 @@
 #include <helper_functions.h>
 #include <vector_types.h>
 
+__constant__ int3 d_kBins[691]; // 8292 bytes
+
+
 // Define atomicAdd for older NVIDIA GPUs
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ > 600
 #else
@@ -47,28 +50,34 @@ __device__ int getBin(double k1, double k2, double k3, double binWidth, int N, d
     swapIfGreater(k1, k3);
     swapIfGreater(k2, k3);
     
-    int i_k1 = (k1 - k_min)/binWidth - 0.5;
-    int j_k2 = (k2 - k_min)/binWidth - 0.5;
-    int k_k3 = (k3 - k_min)/binWidth - 0.5;
+    int i_k1 = (k1 - k_min)/binWidth;
+    int j_k2 = (k2 - k_min)/binWidth;
+    int k_k3 = (k3 - k_min)/binWidth;
     
-    int index = 0;
+    for (int i = 0; i < 691; ++i) {
+        if (i_k1 == d_kBins[i].x && j_k2 == d_kBins[i].y && k_k3 == d_kBins[i].z) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+std::vector<int3> setBins(double binWidth, int N, double k_min, double k_max) {
+    std::vector<int3> kBins;
     for (int i = 0; i < N; ++i) {
         double k_1 = k_min + (i + 0.5)*binWidth;
         for (int j = i; j < N; ++j) {
             double k_2 = k_min + (j + 0.5)*binWidth;
             for (int k = j; k < N; ++k) {
                 double k_3 = k_min + (k + 0.5)*binWidth;
-                if (k_3 <= k_1 + k_2 && k_3 <= k_max) {
-                    if (i == i_k1 && j == j_k2 && k == k_k3) {
-                        return index;
-                    } else {
-                        index++;
-                    }
+                if (k_3 <= k_1 + k_2 && k_3 < k_max) {
+                    int3 temp = {i, j, k};
+                    kBins.push_back(temp);
                 }
             }
         }
     }
-    return -1;
+    return kBins;
 }
     
 
@@ -181,8 +190,8 @@ __global__ void calcB0(double3 *A_0, int4 *kvec, double *Bk, int3 N_grid,
     int zShift = N_grid.z/2;
     
     __shared__ double Bk_local[691];
-    if (tid < 691)
-        Bk_local[tid] = 0;
+    if (threadIdx.x < 691)
+        Bk_local[threadIdx.x] = 0;
     __syncthreads();
     
     if (tid < N) {
@@ -210,10 +219,10 @@ __global__ void calcB0(double3 *A_0, int4 *kvec, double *Bk, int3 N_grid,
             }
         }
         __syncthreads();
-        
-        if (tid < 691) {
-                atomicAdd(&Bk[tid], Bk_local[tid]);
-        }
+    }
+    
+    if (threadIdx.x < 691) {
+        atomicAdd(&Bk[threadIdx.x], Bk_local[threadIdx.x]);
     }
 }
 
@@ -226,8 +235,8 @@ __global__ void calcB2(double3 *A_0, double3 *A_2, int4 *kvec, double *Bk, int3 
     int zShift = N_grid.z/2;
     
     __shared__ double Bk_local[691];
-    if (tid < 691)
-        Bk_local[tid] = 0;
+    if (threadIdx.x < 691)
+        Bk_local[threadIdx.x] = 0;
     __syncthreads();
     
     if (tid < N) {
@@ -255,10 +264,10 @@ __global__ void calcB2(double3 *A_0, double3 *A_2, int4 *kvec, double *Bk, int3 
             }
         }
         __syncthreads();
-        
-        if (tid < 691) {
-                atomicAdd(&Bk[tid], Bk_local[tid]);
-        }
+    }
+    
+    if (threadIdx.x < 691) {
+        atomicAdd(&Bk[threadIdx.x], Bk_local[threadIdx.x]);
     }
 }
 
@@ -316,8 +325,8 @@ __global__ void calcNtri(double3 *A_0, int4 *k, unsigned int *N_tri, int3 N_grid
     int zShift = N_grid.z/2;
     
     __shared__ unsigned int Ntri_local[691];
-    if (tid < 691) {
-        Ntri_local[tid] = 0;
+    if (threadIdx.x < 691) {
+        Ntri_local[threadIdx.x] = 0;
     }
     __syncthreads();
     
@@ -341,10 +350,10 @@ __global__ void calcNtri(double3 *A_0, int4 *k, unsigned int *N_tri, int3 N_grid
             }
         }
         __syncthreads();
-
-        if (tid < 691) {
-            atomicAdd(&N_tri[tid], Ntri_local[tid]);
-        }
+    }
+    
+    if (threadIdx.x < 691) {
+        atomicAdd(&N_tri[threadIdx.x], Ntri_local[threadIdx.x]);
     }
 }
 

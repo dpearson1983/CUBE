@@ -114,6 +114,12 @@ int main(int argc, char *argv[]) {
     }
     fout.close();
     
+    fout.open("smallCube.dat");
+    fout.precision(15);
+    for (size_t i = 0; i < a_0.size(); ++i)
+        fout << a_0[i].x << " " << a_0[i].y << " " << a_0[i].z << "\n";
+    fout.close();
+    
     std::vector<double3> ks;
     int numBispecBins = getNumBispecBins(p.getd("k_min"), p.getd("k_max"), p.getd("Delta_k"), ks);
     std::cout << "Number of bispectrum bins: " << numBispecBins << std::endl;
@@ -144,26 +150,33 @@ int main(int argc, char *argv[]) {
                          cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(dkvec, kvec.data(), kvec.size()*sizeof(int4), cudaMemcpyHostToDevice));
     
-    int numBlocks1D = kvec.size()/1024 + 1;
-    dim3 num_threads(1024);
-    dim3 num_blocks(numBlocks1D);
+//     int numBlocks1D = kvec.size()/1024 + 1;
+//     dim3 num_threads(1024);
+//     dim3 num_blocks(numBlocks1D);
+    int numBlocks1D = kvec.size()/32 + 1;
+    dim3 num_threads(32,32);
+    dim3 num_blocks(numBlocks1D,numBlocks1D/2 + 1);
     double2 k_lim = {p.getd("k_min"), p.getd("k_max")};
+    
+    std::vector<int3> kBins = setBins(p.getd("Delta_k"), (k_lim.y - k_lim.x)/p.getd("Delta_k"), k_lim.x, 
+                                      k_lim.y);
+    gpuErrchk(cudaMemcpyToSymbol(d_kBins, kBins.data(), 691*sizeof(int3)));
     std::cout << num_blocks.x << " " << num_blocks.y << std::endl;
     
     std::cout << "Calculating the number of triangles..." << std::endl;
-    calcNtri<<<num_blocks,num_threads>>>(da_0, dkvec, dN_tri, N_grid, kvec.size(), p.getd("Delta_k"),
+    calcN_tri<<<num_blocks,num_threads>>>(da_0, dkvec, dN_tri, N_grid, kvec.size(), p.getd("Delta_k"),
                                           numBispecBins, k_lim);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
     
-    std::cout << "Calculating the bispectrum monopole..." << std::endl;
-    calcB0<<<num_blocks,num_threads>>>(da_0, dkvec, dB_0, N_grid, kvec.size(), 
-                                         p.getd("Delta_k"), numBispecBins, k_lim);
-    gpuErrchk(cudaPeekAtLastError());
-    gpuErrchk(cudaDeviceSynchronize());
+//     std::cout << "Calculating the bispectrum monopole..." << std::endl;
+//     calcB0<<<num_blocks,num_threads>>>(da_0, dkvec, dB_0, N_grid, kvec.size(), 
+//                                          p.getd("Delta_k"), numBispecBins, k_lim);
+//     gpuErrchk(cudaPeekAtLastError());
+//     gpuErrchk(cudaDeviceSynchronize());
     
     std::cout << "Calculating the bispectrum monopole..." << std::endl;
-    calcB2<<<num_blocks,num_threads>>>(da_0, da_2, dkvec, dB_2, N_grid, kvec.size(), 
+    calcB_02<<<num_blocks,num_threads>>>(da_0, da_2, dkvec, dB_0, dB_2, N_grid, kvec.size(), 
                                          p.getd("Delta_k"), numBispecBins, k_lim);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
