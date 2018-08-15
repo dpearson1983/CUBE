@@ -4,7 +4,7 @@ CXXFLAGS = -march=native -mtune=native -O3
 LIBGSL = -lgsl -lgslcblas -lm
 LIBFFTW = -lfftw3 -lfftw3_omp -fopenmp
 LIBFITS = -lCCfits -lcfitsio
-VXXFLAGS = -arch=sm_50 -ccbin=cuda-g++ --compiler-options "$(LIBGSL) $(LIBFFTW) $(LIBFITS) $(CXXFLAGS)"
+VXXFLAGS = -arch=sm_52 -ccbin=cuda-g++ --compiler-options "$(LIBGSL) $(LIBFFTW) $(LIBFITS) $(CXXFLAGS)"
 
 build: cic cosmology cube file_io galaxy harppi line_of_sight power transformers main.cu
 	$(VXX) $(VXXFLAGS) -O3 -o $(HOME)/bin/cube main.cu obj/*.o

@@ -62,6 +62,14 @@ __device__ int getBin(double k1, double k2, double k3, double binWidth, int N, d
     return -1;
 }
 
+__device__ int3 get_indices(int index, int3 N) {
+    int3 unravel;
+    unravel.z = index % N.z;
+    unravel.y = ((index - unravel.z)/N.z) % N.y;
+    unravel.x = ((index - unravel.z)/N.z - unravel.y)/N.y;
+    return unravel;
+}
+
 std::vector<int3> setBins(double binWidth, int N, double k_min, double k_max) {
     std::vector<int3> kBins;
     for (int i = 0; i < N; ++i) {
@@ -214,7 +222,9 @@ __global__ void calcB0(double3 *A_0, int4 *kvec, double *Bk, int3 N_grid,
                 if (dk_3.z < k_lim.y && dk_3.z >= k_lim.x) {
                     double val = (dk_1.x*dk_2.x*dk_3.x - dk_1.x*dk_2.y*dk_3.y - dk_1.y*dk_2.x*dk_3.y - dk_1.y*dk_2.y*dk_3.x);
                     int bin = getBin(dk_1.z, dk_2.z, dk_3.z, binWidth, numBins, k_lim.x, k_lim.y);
-                    atomicAdd(&Bk_local[bin], val);
+                    if (bin >= 0 && bin < 691) {
+                        atomicAdd(&Bk_local[bin], val);
+                    }
                 }
             }
         }
@@ -259,7 +269,9 @@ __global__ void calcB2(double3 *A_0, double3 *A_2, int4 *kvec, double *Bk, int3 
                 if (dk_3.z < k_lim.y && dk_3.z >= k_lim.x) {
                     double val = (dk_1.x*dk_2.x*dk_3.x - dk_1.x*dk_2.y*dk_3.y - dk_1.y*dk_2.x*dk_3.y - dk_1.y*dk_2.y*dk_3.x);
                     int bin = getBin(dk_1.z, dk_2.z, dk_3.z, binWidth, numBins, k_lim.x, k_lim.y);
-                    atomicAdd(&Bk_local[bin], val);
+                    if (bin >= 0 && bin < 691) {
+                        atomicAdd(&Bk_local[bin], val);
+                    }
                 }
             }
         }
@@ -324,9 +336,16 @@ __global__ void calcNtri(double3 *A_0, int4 *k, unsigned int *N_tri, int3 N_grid
     int yShift = N_grid.y/2;
     int zShift = N_grid.z/2;
     
-    __shared__ unsigned int Ntri_local[691];
-    if (threadIdx.x < 691) {
-        Ntri_local[threadIdx.x] = 0;
+    __shared__ int3 N_cube;
+    __shared__ unsigned int Ntri_local[4096];
+    for (int i = threadIdx.x*4; i < threadIdx.x*4 + 4; ++i) {
+        Ntri_local[i] = 0;
+    }
+    if (threadIdx.x == 0) {
+        int n = (k_lim.y - k_lim.x)/binWidth;
+        N_cube.x = n;
+        N_cube.y = n;
+        N_cube.z = n;
     }
     __syncthreads();
     
@@ -344,16 +363,23 @@ __global__ void calcNtri(double3 *A_0, int4 *k, unsigned int *N_tri, int3 N_grid
                 k_3.w = k3 + N_grid.z*(j3 + N_grid.y*i3);
                 double3 dk_3 = A_0[k_3.w];
                 if (dk_3.z < k_lim.y && dk_3.z >= k_lim.x) {
-                    int bin = getBin(dk_1.z, dk_2.z, dk_3.z, binWidth, numBins, k_lim.x, k_lim.y);
-                    atomicAdd(&Ntri_local[bin], 1);
+                    int4 bin = {int((dk_1.z - k_lim.x)/binWidth), int((dk_2.z - k_lim.x)/binWidth),
+                                int((dk_3.z - k_lim.x)/binWidth), 0};
+                    bin.w = bin.z + N_cube.z*(bin.y + N_cube.y*bin.x);
+                    if (bin.w >= 0 && bin.w < 4096) {
+                        atomicAdd(&Ntri_local[bin.w], 1);
+                    }
                 }
             }
         }
         __syncthreads();
     }
     
-    if (threadIdx.x < 691) {
-        atomicAdd(&N_tri[threadIdx.x], Ntri_local[threadIdx.x]);
+    for (int i = threadIdx.x*4; i < threadIdx.x*4 + 4; ++i) {
+        int3 indices = get_indices(i, N_cube);
+        int bin = getBin(k_lim.x + (indices.x + 0.5)*binWidth, k_lim.x + (indices.y + 0.5)*binWidth,
+                         k_lim.x + (indices.z + 0.5)*binWidth, binWidth, numBins, k_lim.x, k_lim.y);
+        atomicAdd(&N_tri[bin], Ntri_local[i]);
     }
 }
 

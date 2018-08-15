@@ -9,9 +9,9 @@ double Delta_k = 0.008
 double z_min = 0.43
 double z_max = 0.7
 
-int Nx = 256
-int Ny = 512
-int Nz = 256
+int Nx = 512
+int Ny = 1024
+int Nz = 512
 
 string dataFileType = DR12
 string ranFileType = DR12_ran
