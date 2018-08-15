@@ -108,44 +108,44 @@ int main(int argc, char *argv[]) {
     
     std::cout << a_0[42].x << ", " << a_2[42].x << std::endl;
     
-    std::ofstream fout("kvec.dat");
-    for (size_t i = 0; i < kvec.size(); ++i) {
-        fout << kvec[i].x << " " << kvec[i].y << " " << kvec[i].z << " " << kvec[i].w << "\n";
-    }
-    fout.close();
-    
-    fout.open("smallCube.dat");
-    fout.precision(15);
-    for (size_t i = 0; i < a_0.size(); ++i)
-        fout << a_0[i].x << " " << a_0[i].y << " " << a_0[i].z << "\n";
-    fout.close();
-    
     std::vector<double3> ks;
+    int numBispecBins1D = (p.getd("k_max") - p.getd("k_min"))/p.getd("Delta_k");
+    int3 N_cube = {numBispecBins1D, numBispecBins1D, numBispecBins1D};
     int numBispecBins = getNumBispecBins(p.getd("k_min"), p.getd("k_max"), p.getd("Delta_k"), ks);
     std::cout << "Number of bispectrum bins: " << numBispecBins << std::endl;
-    std::vector<unsigned int> N_tri(numBispecBins + 1);
-    std::vector<double> B_0(numBispecBins);
-    std::vector<double> B_2(numBispecBins);
-    unsigned int *dN_tri;
-    double *dB_0, *dB_2;
+    std::vector<unsigned int> N_tris(numBispecBins);
+    std::vector<double> B_0s(numBispecBins);
+    std::vector<double> B_2s(numBispecBins);
+    std::vector<unsigned int> N_trib(numBispecBins1D*numBispecBins1D*numBispecBins1D);
+    std::vector<double> B_0b(numBispecBins1D*numBispecBins1D*numBispecBins1D);
+    std::vector<double> B_2b(numBispecBins1D*numBispecBins1D*numBispecBins1D);
+    unsigned int *dN_tris, *dN_trib;
+    double *dB_0s, *dB_2s, *dB_0b, *dB_2b;
     double3 *da_0, *da_2;
     int4 *dkvec;
     
     gpuErrchk(cudaSetDevice(0));
     
     // Allocate GPU memory
-    gpuErrchk(cudaMalloc((void **)&dN_tri, N_tri.size()*sizeof(unsigned int)));
-    gpuErrchk(cudaMalloc((void **)&dB_0, numBispecBins*sizeof(double)));
-    gpuErrchk(cudaMalloc((void **)&dB_2, numBispecBins*sizeof(double)));
+    gpuErrchk(cudaMalloc((void **)&dN_tris, N_tris.size()*sizeof(unsigned int)));
+    gpuErrchk(cudaMalloc((void **)&dB_0s, B_0s.size()*sizeof(double)));
+    gpuErrchk(cudaMalloc((void **)&dB_2s, B_2s.size()*sizeof(double)));
+    gpuErrchk(cudaMalloc((void **)&dN_trib, N_trib.size()*sizeof(unsigned int)));
+    gpuErrchk(cudaMalloc((void **)&dB_0b, B_0b.size()*sizeof(double)));
+    gpuErrchk(cudaMalloc((void **)&dB_2b, B_2b.size()*sizeof(double)));
     gpuErrchk(cudaMalloc((void **)&da_0, N_grid.x*N_grid.y*N_grid.z*sizeof(double3)));
     gpuErrchk(cudaMalloc((void **)&da_2, N_grid.x*N_grid.y*N_grid.z*sizeof(double3)));
     gpuErrchk(cudaMalloc((void **)&dkvec, kvec.size()*sizeof(int4)));
     
     // Copy data to the GPU, this initializes dN_tri, dB_0 and dB_2 to zero
-    gpuErrchk(cudaMemcpy(dN_tri, N_tri.data(), N_tri.size()*sizeof(unsigned int), 
+    gpuErrchk(cudaMemcpy(dN_tris, N_tris.data(), N_tris.size()*sizeof(unsigned int), 
                          cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(dB_0, B_0.data(), numBispecBins*sizeof(double), cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(dB_2, B_2.data(), numBispecBins*sizeof(double), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(dB_0s, B_0s.data(), B_0s.size()*sizeof(double), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(dB_2s, B_2s.data(), B_2s.size()*sizeof(double), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(dN_trib, N_trib.data(), N_trib.size()*sizeof(unsigned int), 
+                         cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(dB_0b, B_0b.data(), B_0b.size()*sizeof(double), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(dB_2b, B_2b.data(), B_2b.size()*sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(da_0, a_0.data(), N_grid.x*N_grid.y*N_grid.z*sizeof(double3), 
                          cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(da_2, a_2.data(), N_grid.x*N_grid.y*N_grid.z*sizeof(double3), 
@@ -162,30 +162,53 @@ int main(int argc, char *argv[]) {
     
     std::vector<int3> kBins = setBins(p.getd("Delta_k"), (k_lim.y - k_lim.x)/p.getd("Delta_k"), k_lim.x, 
                                       k_lim.y);
-    fout.open("bin.dat");
-    for (int i = 0; i < kBins.size(); ++i)
-        fout << kBins[i].x << " " << kBins[i].y << " " << kBins[i].z << "\n";
-    fout.close();
+//     fout.open("bin.dat");
+//     for (int i = 0; i < kBins.size(); ++i)
+//         fout << kBins[i].x << " " << kBins[i].y << " " << kBins[i].z << "\n";
+//     fout.close();
     gpuErrchk(cudaMemcpyToSymbol(d_kBins, kBins.data(), 691*sizeof(int3)));
     std::cout << num_blocks.x << " " << num_blocks.y << std::endl;
     
     std::cout << "Calculating the number of triangles..." << std::endl;
-    calcNtri<<<num_blocks,num_threads>>>(da_0, dkvec, dN_tri, N_grid, kvec.size(), p.getd("Delta_k"),
-                                          numBispecBins, k_lim);
+    cudaEvent_t begin, end;
+    float elapsedTime;
+    cudaEventCreate(&begin);
+    cudaEventRecord(begin, 0);
+    calcNtri<<<num_blocks,num_threads>>>(da_0, dkvec, dN_trib, N_grid, kvec.size(),
+                                         p.getd("Delta_k"), numBispecBins1D, k_lim);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
+    cudaEventCreate(&end);
+    cudaEventRecord(end, 0);
+    cudaEventSynchronize(end);
+    cudaEventElapsedTime(&elapsedTime, begin, end);
+    std::cout << "Time to calculate number of triangles: " << elapsedTime << " ms" << std::endl;
     
     std::cout << "Calculating the bispectrum monopole..." << std::endl;
-    calcB0<<<num_blocks,num_threads>>>(da_0, dkvec, dB_0, N_grid, kvec.size(), 
-                                         p.getd("Delta_k"), numBispecBins, k_lim);
+    cudaEventCreate(&begin);
+    cudaEventRecord(begin, 0);
+    calcB0<<<num_blocks,num_threads>>>(da_0, dkvec, dB_0b, N_grid, kvec.size(), 
+                                         p.getd("Delta_k"), numBispecBins1D, k_lim);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
+    cudaEventCreate(&end);
+    cudaEventRecord(end, 0);
+    cudaEventSynchronize(end);
+    cudaEventElapsedTime(&elapsedTime, begin, end);
+    std::cout << "Time to calculate bispectrum monopole: " << elapsedTime << " ms" << std::endl;
     
-    std::cout << "Calculating the bispectrum monopole..." << std::endl;
-    calcB2<<<num_blocks,num_threads>>>(da_0, da_2, dkvec, dB_2, N_grid, kvec.size(), 
-                                         p.getd("Delta_k"), numBispecBins, k_lim);
+    std::cout << "Calculating the bispectrum quadrupole..." << std::endl;
+    cudaEventCreate(&begin);
+    cudaEventRecord(begin, 0);
+    calcB2<<<num_blocks,num_threads>>>(da_0, da_2, dkvec, dB_2b, N_grid, kvec.size(), 
+                                         p.getd("Delta_k"), numBispecBins1D, k_lim);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
+    cudaEventCreate(&end);
+    cudaEventRecord(end, 0);
+    cudaEventSynchronize(end);
+    cudaEventElapsedTime(&elapsedTime, begin, end);
+    std::cout << "Time to calculate bispectrum quadrupole: " << elapsedTime << " ms" << std::endl;
     
     int normBlocks, normThreads;
     if (numBispecBins <= 1024) {
@@ -195,24 +218,30 @@ int main(int argc, char *argv[]) {
         normBlocks = numBispecBins/1024 + 1;
         normThreads = 1024;
     }
-    normB_l<<<normBlocks,normThreads>>>(dB_0, dN_tri, gal_bk_nbw.z, numBispecBins);
-    normB_l<<<normBlocks,normThreads>>>(dB_2, dN_tri, gal_bk_nbw.z, numBispecBins);
+    // TODO: Generalize this to other numbers of bins
+    reduceGrid<<<4,1024>>>(dN_tris, dN_trib, N_cube, numBispecBins, k_lim, p.getd("Delta_k"));
+    reduceGrid<<<4,1024>>>(dB_0s, dB_0b, N_cube, numBispecBins, k_lim, p.getd("Delta_k"));
+    reduceGrid<<<4,1024>>>(dB_2s, dB_2b, N_cube, numBispecBins, k_lim, p.getd("Delta_k"));
     
-    gpuErrchk(cudaMemcpy(B_0.data(), dB_0, numBispecBins*sizeof(double), cudaMemcpyDeviceToHost));
-    gpuErrchk(cudaMemcpy(B_2.data(), dB_2, numBispecBins*sizeof(double), cudaMemcpyDeviceToHost));
-    gpuErrchk(cudaMemcpy(N_tri.data(), dN_tri, N_tri.size()*sizeof(unsigned int), 
+    normB_l<<<normBlocks,normThreads>>>(dB_0s, dN_tris, gal_bk_nbw.z, numBispecBins);
+    normB_l<<<normBlocks,normThreads>>>(dB_2s, dN_tris, gal_bk_nbw.z, numBispecBins);
+    
+    gpuErrchk(cudaMemcpy(B_0s.data(), dB_0s, numBispecBins*sizeof(double), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(B_2s.data(), dB_2s, numBispecBins*sizeof(double), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(N_tris.data(), dN_tris, N_tris.size()*sizeof(unsigned int), 
                          cudaMemcpyDeviceToHost));
     
-    std::cout << N_tri[numBispecBins] << std::endl;
+    writeBispectrumFile(p.gets("outFile"), B_0s, B_2s, N_tris, ks);
     
-    writeBispectrumFile(p.gets("outFile"), B_0, B_2, N_tri, ks);
-    
-    gpuErrchk(cudaFree(dB_0));
-    gpuErrchk(cudaFree(dB_2));
+    gpuErrchk(cudaFree(dB_0s));
+    gpuErrchk(cudaFree(dB_2s));
     gpuErrchk(cudaFree(da_0));
     gpuErrchk(cudaFree(da_2));
     gpuErrchk(cudaFree(dkvec));
-    gpuErrchk(cudaFree(dN_tri));
+    gpuErrchk(cudaFree(dN_tris));
+    gpuErrchk(cudaFree(dB_0b));
+    gpuErrchk(cudaFree(dB_2b));
+    gpuErrchk(cudaFree(dN_trib));
     
     return 0;
 }
